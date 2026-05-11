@@ -1,0 +1,400 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String         @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  timezone      String         @default("UTC")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  activityTemplates ActivityTemplate[]
+  activities    Activity[]
+  habits        Habit[]
+  habitLogs     HabitLog[]
+  moodEntries   MoodEntry[]
+  moodPeriods   MoodPeriod[]
+  journalEntries JournalEntry[]
+  lifeEvents    LifeEvent[]
+  lifeEventSeries LifeEventSeries[]
+  lifeEventDayExposures LifeEventDayExposure[]
+  insights      Insight[]
+
+  @@index([email])
+}
+
+model Activity {
+  id                  String         @id @default(cuid())
+  userId              String
+  templateId          String?
+  title               String
+  category            ActivityCategory
+  notes               String?
+  recurring           Boolean        @default(false)
+  recurrencePattern   RecurrencePattern?
+  recurrenceCustom    String?
+  recurrenceGroupId   String?
+  isRecurringGenerated Boolean       @default(false)
+  scheduledAt         DateTime
+  status              ActivityStatus @default(SCHEDULED)
+  durationMinutes     Int?
+  completionMoodScore Int?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  completedAt         DateTime?
+  skippedAt           DateTime?
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template            ActivityTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([templateId])
+  @@index([userId, scheduledAt])
+  @@index([userId, status])
+  @@index([userId, recurrenceGroupId])
+  @@index([category])
+}
+
+model ActivityTemplate {
+  id                   String           @id @default(cuid())
+  userId               String
+  title                String
+  normalizedTitle      String
+  category             ActivityCategory
+  notes                String?
+  defaultDurationMinutes Int?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities           Activity[]
+
+  @@unique([userId, normalizedTitle, category])
+  @@index([userId, updatedAt])
+}
+
+model Habit {
+  id             String        @id @default(cuid())
+  userId         String
+  name           String
+  category       HabitCategory
+  type           HabitType
+  notes          String?
+  targetPerWeek  Int           @default(5)
+  isArchived     Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs           HabitLog[]
+
+  @@index([userId])
+  @@index([type])
+}
+
+model HabitLog {
+  id          String         @id @default(cuid())
+  userId      String
+  habitId     String
+  day         DateTime       @db.Date
+  status      HabitLogStatus @default(COMPLETED)
+  value       Int?
+  createdAt   DateTime       @default(now())
+  habit       Habit          @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, day])
+  @@index([userId, day])
+}
+
+model MoodEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  day         DateTime @db.Date
+  score       Int
+  energy      Int?
+  stress      Int?
+  sleepHours  Decimal? @db.Decimal(4, 1)
+  sleepQuality Int?
+  workStress  Int?
+  socialQuality Int?
+  moodStability Int?
+  reflectionCompletedAt DateTime?
+  notes       String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periods     MoodPeriod[]
+
+  @@unique([userId, day])
+  @@index([userId, day])
+}
+
+model MoodPeriod {
+  id            String    @id @default(cuid())
+  userId        String
+  moodEntryId   String
+  day           DateTime  @db.Date
+  startMinute   Int
+  endMinute     Int
+  score         Int
+  notes         String?
+  tags          String[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moodEntry     MoodEntry @relation(fields: [moodEntryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, day])
+  @@index([moodEntryId, startMinute])
+  @@index([userId, day, startMinute, endMinute])
+}
+
+model JournalEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  day        DateTime @db.Date
+  title      String?
+  content    String   @db.Text
+  moodScore  Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, day])
+}
+
+model LifeEvent {
+  id                  String             @id @default(cuid())
+  userId              String
+  recurrenceSeriesId  String?
+  title               String
+  category            LifeEventCategory
+  customCategoryLabel String?
+  description         String?            @db.Text
+  severityScore       Int                @default(3)
+  sentiment           LifeEventSentiment?
+  startAt             DateTime
+  endAt               DateTime?
+  isOngoing           Boolean            @default(false)
+  tags                String[]
+  source              LifeEventSource    @default(MANUAL)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recurrenceSeries    LifeEventSeries?   @relation(fields: [recurrenceSeriesId], references: [id], onDelete: SetNull)
+  dayExposures        LifeEventDayExposure[]
+
+  @@index([userId, startAt])
+  @@index([userId, category])
+  @@index([userId, isOngoing])
+  @@index([recurrenceSeriesId])
+}
+
+model LifeEventSeries {
+  id                   String                     @id @default(cuid())
+  userId               String
+  title                String
+  category             LifeEventCategory
+  customCategoryLabel  String?
+  defaultSeverityScore Int                        @default(3)
+  defaultSentiment     LifeEventSentiment?
+  recurrencePattern    LifeEventRecurrencePattern @default(CUSTOM)
+  recurrenceInterval   Int?
+  recurrenceRule       String?
+  timezone             String                     @default("UTC")
+  isActive             Boolean                    @default(true)
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  occurrences          LifeEvent[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, isActive])
+}
+
+model LifeEventDayExposure {
+  id             String             @id @default(cuid())
+  userId         String
+  lifeEventId    String
+  day            DateTime           @db.Date
+  overlapMinutes Int
+  overlapRatio   Float
+  severityScore  Int
+  sentiment      LifeEventSentiment?
+  weightedImpact Float
+  category       LifeEventCategory
+  tags           String[]
+  createdAt      DateTime           @default(now())
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifeEvent      LifeEvent          @relation(fields: [lifeEventId], references: [id], onDelete: Cascade)
+
+  @@unique([lifeEventId, day])
+  @@index([userId, day])
+  @@index([userId, category, day])
+}
+
+model Insight {
+  id          String                @id @default(cuid())
+  userId      String
+  title       String
+  summary     String
+  metric      InsightMetric
+  direction   CorrelationDirection
+  strength    Float
+  confidence  Float
+  windowStart DateTime             @db.Date
+  windowEnd   DateTime             @db.Date
+  payload     Json
+  surfacedAt  DateTime             @default(now())
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, surfacedAt])
+  @@index([metric])
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@unique([token])
+}
+
+enum ActivityCategory {
+  EXERCISE
+  SLEEP
+  SOCIAL
+  FOCUS
+  MINDFULNESS
+  CREATIVE
+  ERRANDS
+  OTHER
+}
+
+enum ActivityStatus {
+  SCHEDULED
+  COMPLETED
+  SKIPPED
+}
+
+enum RecurrencePattern {
+  DAILY
+  WEEKLY
+  CUSTOM
+}
+
+enum HabitCategory {
+  MOVEMENT
+  SLEEP
+  NOURISHMENT
+  MINDFULNESS
+  SOCIAL
+  DIGITAL
+  WORK
+  OTHER
+}
+
+enum HabitType {
+  POSITIVE
+  NEGATIVE
+}
+
+enum HabitLogStatus {
+  COMPLETED
+  SKIPPED
+}
+
+enum InsightMetric {
+  ACTIVITY_TO_MOOD
+  HABIT_TO_MOOD
+  SLEEP_TO_MOOD
+  SOCIAL_TO_MOOD
+  MOOD_STABILITY
+  PREVIOUS_DAY_TO_MOOD
+  JOURNAL_TO_MOOD
+  LIFE_EVENT_TO_MOOD
+}
+
+enum CorrelationDirection {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+}
+
+enum LifeEventCategory {
+  ILLNESS
+  GRIEF_LOSS
+  FAMILY_STRESS
+  RELATIONSHIP_STRESS
+  FINANCIAL_STRESS
+  BURNOUT
+  TRAVEL
+  HORMONAL_HEALTH
+  MAJOR_POSITIVE
+  TRANSITION
+  CUSTOM
+  OTHER
+}
+
+enum LifeEventSentiment {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+  MIXED
+}
+
+enum LifeEventSource {
+  MANUAL
+  RECURRING_GENERATED
+  IMPORTED
+}
+
+enum LifeEventRecurrencePattern {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
