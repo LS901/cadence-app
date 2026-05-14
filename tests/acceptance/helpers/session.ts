@@ -3,10 +3,11 @@ import { expect, type Page } from "@playwright/test";
 export async function signIn(page: Page) {
   await page.goto("/sign-in", { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle");
-  await expect(page.getByText("Sign in to Cadence")).toBeVisible();
-  await page.getByLabel("Email").fill("demo@cadence.app");
-  await page.getByLabel("Password").fill("cadence-demo");
-  const signInButton = page.getByRole("button", { name: /Open guided demo|Continue to dashboard/ });
+  await expect(page.getByText("Open the Cadence demo")).toBeVisible();
+  await expect(page.getByText("Read-only shared workspace")).toBeVisible();
+  await expect(page.getByText("demo@cadence.app")).toBeVisible();
+  await expect(page.getByText("cadence-demo")).toBeVisible();
+  const signInButton = page.getByRole("button", { name: "Open guided demo" });
   await expect(signInButton).toBeEnabled();
   await signInButton.click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
@@ -16,7 +17,7 @@ export async function signIn(page: Page) {
 export async function signOut(page: Page) {
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page.getByText("Sign in to Cadence")).toBeVisible();
+  await expect(page.getByText("Open the Cadence demo")).toBeVisible();
 }
 
 export function uniqueLabel(prefix: string) {

@@ -2,30 +2,26 @@ import { expect, test } from "@playwright/test";
 import { signIn, signOut } from "./helpers/session";
 
 test.describe("Stage 3 auth and public smoke", () => {
-  test("routes the landing-page guided demo into a prefilled sign-in flow", async ({ page }) => {
+  test("routes the landing-page guided demo into the shared demo sign-in flow", async ({ page }) => {
     await page.goto("/");
 
     await page.getByRole("link", { name: "Explore the guided demo" }).click();
 
     await expect(page).toHaveURL(/\/sign-in$/);
-    await expect(page.getByLabel("Email")).toHaveValue("demo@cadence.app");
-    await expect(page.getByLabel("Password")).toHaveValue("cadence-demo");
-
-    await page.getByRole("button", { name: "Switch to my account" }).click();
-    await expect(page.getByLabel("Email")).toHaveValue("");
-    await expect(page.getByLabel("Password")).toHaveValue("");
-    await expect(page.getByRole("button", { name: "Continue to dashboard" })).toBeEnabled();
-
-    await page.getByRole("button", { name: "Use demo credentials" }).click();
-    await expect(page.getByLabel("Email")).toHaveValue("demo@cadence.app");
-    await expect(page.getByLabel("Password")).toHaveValue("cadence-demo");
+    await expect(page.getByText("Open the Cadence demo")).toBeVisible();
+    await expect(page.getByText("Read-only shared workspace")).toBeVisible();
+    await expect(page.getByText("demo@cadence.app")).toBeVisible();
+    await expect(page.getByText("cadence-demo")).toBeVisible();
+    await expect(
+      page.getByText("Account creation is intentionally disabled for this read-only portfolio demonstration.")
+    ).toBeVisible();
 
     const guidedDemoButton = page.getByRole("button", { name: "Open guided demo" });
     await expect(guidedDemoButton).toBeEnabled();
     await guidedDemoButton.click();
 
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByText("Start with the weekly review, then follow the carry-forward experiment.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Carry into Planner" })).toBeVisible();
   });
 
   test("allows the demo user to sign in and sign out", async ({ page }) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +23,7 @@ import { signInSchema, type SignInValues } from "@/lib/validation/auth";
 
 export function SignInForm() {
   const router = useRouter();
+  const [isReady, setIsReady] = useState(false);
   const [isPending, startTransition] = useTransition();
   const dashboardHref = "/dashboard?entry=guided-demo";
   const form = useForm<SignInValues>({
@@ -32,6 +33,10 @@ export function SignInForm() {
       password: demoUser.password,
     },
   });
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
 
   const onSubmit = (values: SignInValues) => {
     startTransition(async () => {
@@ -80,7 +85,14 @@ export function SignInForm() {
         <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" autoComplete="email" readOnly {...form.register("email")} />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              defaultValue={demoUser.email}
+              readOnly
+              {...form.register("email")}
+            />
             {form.formState.errors.email ? (
               <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
             ) : null}
@@ -88,13 +100,25 @@ export function SignInForm() {
 
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" autoComplete="current-password" readOnly {...form.register("password")} />
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              defaultValue={demoUser.password}
+              readOnly
+              {...form.register("password")}
+            />
             {form.formState.errors.password ? (
               <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
             ) : null}
           </div>
 
-          <Button className="h-11 w-full rounded-full" disabled={isPending} type="submit">
+          <Button
+            className="h-11 w-full rounded-full"
+            disabled={!isReady || isPending}
+            onClick={form.handleSubmit(onSubmit)}
+            type="button"
+          >
             {isPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
             Open guided demo
           </Button>

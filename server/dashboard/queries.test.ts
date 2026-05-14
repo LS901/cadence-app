@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSameDay } from "date-fns";
+import { format, isSameDay, subDays } from "date-fns";
 import {
   buildDashboardDataFromSourceData,
   getDashboardDataWithDependencies,
@@ -124,11 +124,14 @@ test("getDashboardDataWithDependencies uses the mock builder when the database i
 
 test("buildDashboardDataFromSourceData applies the focus window and keeps the dashboard composition coherent", () => {
   const sourceData = createSourceData();
+  const referenceNow = sourceData.moodEntries.reduce(
+    (latestDay, entry) => (entry.day > latestDay ? entry.day : latestDay),
+    sourceData.moodEntries[0]!.day
+  );
   const focusWindow = {
-    start: new Date("2026-05-08T10:00:00.000Z"),
-    end: new Date("2026-05-10T22:00:00.000Z"),
+    start: subDays(referenceNow, 2),
+    end: referenceNow,
   };
-  const referenceNow = new Date("2026-05-10T18:00:00.000Z");
   const expectedTodayEntry = sourceData.moodEntries.find((entry) => isSameDay(entry.day, referenceNow));
 
   const result = buildDashboardDataFromSourceData(demoUser.id, sourceData, focusWindow, referenceNow);
@@ -138,9 +141,9 @@ test("buildDashboardDataFromSourceData applies the focus window and keeps the da
   assert.ok(result.moodSeries.length > 0);
   assert.ok(result.moodSeries.length <= 3);
   const quickCaptureDay = new Date(result.todayQuickCapture.dayIso);
-  assert.equal(quickCaptureDay.getFullYear(), 2026);
-  assert.equal(quickCaptureDay.getMonth(), 4);
-  assert.equal(quickCaptureDay.getDate(), 10);
+  assert.equal(quickCaptureDay.getFullYear(), referenceNow.getFullYear());
+  assert.equal(quickCaptureDay.getMonth(), referenceNow.getMonth());
+  assert.equal(quickCaptureDay.getDate(), referenceNow.getDate());
   assert.equal(quickCaptureDay.getHours(), 0);
   assert.equal(quickCaptureDay.getMinutes(), 0);
   assert.equal(result.todayQuickCapture.score, expectedTodayEntry?.score ?? null);
@@ -152,7 +155,9 @@ test("buildDashboardDataFromSourceData applies the focus window and keeps the da
   assert.ok(result.plannerPreview.length <= 4);
   assert.ok(result.habitsSnapshot.every((habit) => habit.progress >= 0 && habit.progress <= 100));
   assert.equal(
-    result.overview[3]?.detail.includes("May 8 - May 10"),
+    result.overview[3]?.detail.includes(
+      `${format(focusWindow.start, "MMM d")} - ${format(focusWindow.end, "MMM d")}`
+    ),
     true
   );
 });

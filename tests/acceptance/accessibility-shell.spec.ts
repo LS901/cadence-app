@@ -2,25 +2,18 @@ import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers/session";
 
 test.describe("Stage 3 accessibility and shell navigation", () => {
-  test("opens and closes the journal editor with keyboard controls", async ({ page }) => {
+  test("shows journal entry controls as disabled in the shared demo", async ({ page }) => {
     await signIn(page);
     await page.goto("/journal");
 
     const newEntryButton = page.getByRole("button", { name: "New entry" });
 
-    await newEntryButton.focus();
+    await expect(newEntryButton).toBeDisabled();
+    await expect(page.getByText("Shared demo is preview-only. Journal writing is disabled.")).toBeVisible();
+
     await page.keyboard.press("Enter");
 
-    const editorDialog = page.getByRole("dialog", { name: "Write a journal entry" });
-    const titleInput = editorDialog.getByLabel("Title");
-
-    await expect(editorDialog).toBeVisible();
-    await expect(titleInput).toBeFocused();
-
-    await page.keyboard.press("Escape");
-
-    await expect(editorDialog).toHaveCount(0);
-    await expect(newEntryButton).toBeFocused();
+    await expect(page.getByRole("dialog", { name: "Write a journal entry" })).toHaveCount(0);
   });
 
   test("supports mobile navigation through the app shell drawer", async ({ page }) => {

@@ -12,7 +12,13 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: "next dev --hostname 127.0.0.1 --port 3002",
+    command: "npm run start:stage3",
+    env: {
+      ...process.env,
+      APP_BASE_URL: "http://127.0.0.1:3002",
+      NEXTAUTH_URL: "http://127.0.0.1:3002",
+      AUTH_TRUST_HOST: "true",
+    },
     url: "http://127.0.0.1:3002",
     reuseExistingServer: false,
     timeout: 120000,

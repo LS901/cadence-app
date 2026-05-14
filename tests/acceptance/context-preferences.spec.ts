@@ -1,48 +1,21 @@
 import { expect, test } from "@playwright/test";
-import { signIn, uniqueLabel } from "./helpers/session";
+import { signIn } from "./helpers/session";
 
 test.describe("Stage 3 settings and context journeys", () => {
-  test("creates, edits, and deletes a life context event", async ({ page }) => {
-    const eventTitle = uniqueLabel("Acceptance context event");
-    const updatedEventTitle = `${eventTitle} updated`;
-
+  test("shows life context in read-only demo mode", async ({ page }) => {
     await signIn(page);
     await page.goto("/life-events");
     await expect(
       page.getByRole("heading", { name: "Keep the bigger picture visible." })
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Log context" }).click();
-    const createDialog = page.getByRole("dialog", { name: "Log context event" });
-    await expect(createDialog).toBeVisible();
-    await createDialog.getByLabel("Title").fill(eventTitle);
-    await createDialog.getByLabel("Description").fill("Acceptance coverage for life-context CRUD.");
-    await createDialog.getByLabel("Tags").fill("acceptance, context");
-    await createDialog.getByRole("button", { name: "Save context" }).click();
+    await expect(page.getByRole("button", { name: "Log context" })).toBeDisabled();
+    await expect(page.getByText("Shared demo is preview-only. Context logging is disabled.")).toBeVisible();
 
-    await expect(page.getByText(eventTitle, { exact: true }).first()).toBeVisible();
-
-    const eventCard = page.getByTestId(/life-event-card-/).filter({ hasText: eventTitle }).first();
-
-    await eventCard.getByRole("button", { name: "Edit" }).click();
-
-    const editDialog = page.getByRole("dialog", { name: "Edit context event" });
-    await expect(editDialog).toBeVisible();
-    await editDialog.getByLabel("Title").fill(updatedEventTitle);
-    await editDialog.getByLabel("Description").fill("Acceptance coverage for edited life context.");
-    await editDialog.getByRole("button", { name: "Save changes" }).click();
-
-    await expect(page.getByText(updatedEventTitle, { exact: true }).first()).toBeVisible();
-
-    const updatedEventCard = page.getByTestId(/life-event-card-/).filter({ hasText: updatedEventTitle }).first();
-
-    await updatedEventCard.getByRole("button", { name: "Delete" }).click();
-
-    const deleteDialog = page.getByRole("dialog", { name: "Delete context event?" });
-    await expect(deleteDialog).toBeVisible();
-    await deleteDialog.getByRole("button", { name: "Delete event" }).click();
-
-    await expect(page.getByText(updatedEventTitle, { exact: true })).toHaveCount(0);
+    const eventCard = page.getByTestId(/life-event-card-/).first();
+    await expect(eventCard).toBeVisible();
+    await expect(eventCard.getByRole("button", { name: "Edit" })).toBeDisabled();
+    await expect(eventCard.getByRole("button", { name: "Delete" })).toBeDisabled();
   });
 
   test("saves device defaults in settings", async ({ page }) => {
