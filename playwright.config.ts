@@ -17,6 +17,9 @@ export default defineConfig({
       ...process.env,
       APP_BASE_URL: "http://127.0.0.1:3002",
       NEXTAUTH_URL: "http://127.0.0.1:3002",
+      NEXTAUTH_SECRET:
+        process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET ?? "cadence-stage3-auth-secret",
+      AUTH_SECRET: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "cadence-stage3-auth-secret",
       AUTH_TRUST_HOST: "true",
     },
     url: "http://127.0.0.1:3002",
