@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,9 +21,13 @@ import { Label } from "@/components/ui/label";
 import { demoUser } from "@/lib/data/mock-cadence";
 import { signInSchema, type SignInValues } from "@/lib/validation/auth";
 
+function subscribeToHydration() {
+  return () => {};
+}
+
 export function SignInForm() {
   const router = useRouter();
-  const [isReady, setIsReady] = useState(false);
+  const isReady = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [isPending, startTransition] = useTransition();
   const dashboardHref = "/dashboard?entry=guided-demo";
   const form = useForm<SignInValues>({
@@ -33,10 +37,6 @@ export function SignInForm() {
       password: demoUser.password,
     },
   });
-
-  useEffect(() => {
-    setIsReady(true);
-  }, []);
 
   const onSubmit = (values: SignInValues) => {
     startTransition(async () => {
