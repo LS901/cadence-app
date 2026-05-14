@@ -238,11 +238,11 @@ export function DashboardOverview({
               <CardTitle className="text-xl sm:text-2xl text-foreground">{data.weeklyReview.title}</CardTitle>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              {/* {entryMode === "guided-demo" ? (
+              {entryMode === "guided-demo" ? (
                 <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.22em]">
                   Start here
                 </Badge>
-              ) : null} */}
+              ) : null}
               <Link
                 href={moodReflectionHref}
                 className={buttonVariants({

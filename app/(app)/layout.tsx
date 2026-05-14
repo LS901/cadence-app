@@ -19,11 +19,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       userEmail={session.user.email ?? "demo@cadence.app"}
     >
       <>
-        {/* {isReadOnlyDemo ? (
+        {isReadOnlyDemo ? (
           <div className="mb-6 rounded-[24px] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-950 dark:text-amber-100">
             You are viewing the shared demo workspace in read-only mode. Changes to mood, planner, habits, journal, context, and settings are intentionally disabled.
           </div>
-        ) : null} */}
+        ) : null}
         {children}
       </>
     </AppShell>

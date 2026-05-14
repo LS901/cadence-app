@@ -3,10 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BookOpenText, BrainCircuit, CalendarDays, HeartPulse, Home, LogOut, Menu, Search, Settings2, Sparkles } from "lucide-react";
+import { Activity, BookOpenText, BrainCircuit, CalendarDays, HeartPulse, Home, LogOut, Menu, Settings2, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { CadenceMark } from "@/components/layout/cadence-mark";
