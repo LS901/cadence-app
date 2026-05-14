@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, endOfDay, endOfWeek, format, isSameDay, startOfDay, startOfWeek, subDays, subWeeks } from "date-fns";
 import { Prisma } from "@prisma/client";
 import { buildMockDashboardData, type DashboardData } from "@/lib/data/mock-cadence";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { db, hasDatabaseUrl } from "@/lib/db";
 import { buildLifeEventTimeline } from "@/lib/life-events";
 import { buildWeeklyReview, buildWeeklyReviewArchiveItem } from "@/features/dashboard/lib/weekly-review";
@@ -22,6 +23,37 @@ function getAverageMood(entries: Array<{ score: number }>) {
   return entries.length
     ? Math.round(entries.reduce((total, entry) => total + entry.score, 0) / entries.length)
     : null;
+}
+
+function getRecentReviewedExperiment(
+  activities: Array<{
+    title: string;
+    experimentOutcome: "SUPPORTED" | "MIXED" | "NOT_SUPPORTED" | null;
+    experimentOutcomeNote?: string | null;
+    experimentReviewedAt?: Date | null;
+    completedAt?: Date | null;
+  }>
+) {
+  const reviewedActivities = activities
+    .filter((activity) => activity.experimentOutcome)
+    .sort((left, right) => {
+      const leftTime = (left.experimentReviewedAt ?? left.completedAt ?? new Date(0)).getTime();
+      const rightTime = (right.experimentReviewedAt ?? right.completedAt ?? new Date(0)).getTime();
+
+      return rightTime - leftTime;
+    });
+
+  const latestReviewedActivity = reviewedActivities[0];
+
+  if (!latestReviewedActivity?.experimentOutcome) {
+    return null;
+  }
+
+  return {
+    title: latestReviewedActivity.title,
+    outcome: latestReviewedActivity.experimentOutcome,
+    note: latestReviewedActivity.experimentOutcomeNote ?? null,
+  };
 }
 
 type FocusWindow = {
@@ -176,7 +208,10 @@ export function buildDashboardDataFromSourceData(
     : habitLogs.filter((log) => log.day >= subDays(now, 6));
   const recentActivities = normalizedFocusWindow
     ? activities.filter((activity) => isWithinFocusWindow(activity.scheduledAt, normalizedFocusWindow))
-    : activities.filter((activity) => activity.scheduledAt >= subDays(now, 6));
+    : activities.filter(
+        (activity) => activity.scheduledAt >= subDays(now, 6) && activity.scheduledAt <= now
+      );
+  const recentExperiment = getRecentReviewedExperiment(recentActivities);
   const scopedJournalEntries = normalizedFocusWindow
     ? journalEntries.filter((entry) => isWithinFocusWindow(entry.day, normalizedFocusWindow))
     : journalEntries;
@@ -311,6 +346,7 @@ export function buildDashboardDataFromSourceData(
     journalCount: normalizedFocusWindow
       ? scopedJournalEntries.length
       : journalEntries.filter((entry) => entry.day >= subDays(now, 6)).length,
+    recentExperiment,
   });
   const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weeklyReviewArchive = Array.from({ length: 3 }, (_, index) => {
@@ -371,6 +407,7 @@ export function buildDashboardDataFromSourceData(
       completedActivities: weekActivities.filter((activity) => activity.status === "COMPLETED").length,
       totalActivities: weekActivities.length,
       journalCount: weekJournalEntries.length,
+      recentExperiment: getRecentReviewedExperiment(weekActivities),
     });
   }).filter((item): item is NonNullable<typeof item> => Boolean(item));
 
@@ -484,6 +521,14 @@ export async function getDashboardDataWithDependencies(
   }
 }
 
-export async function getDashboardData(userId: string, focusWindow?: FocusWindow | null): Promise<DashboardData> {
-  return getDashboardDataWithDependencies(userId, focusWindow);
+export async function getDashboardData(
+  userId: string,
+  focusWindow?: FocusWindow | null,
+  scenario: MockScenarioKey = defaultMockScenario
+): Promise<DashboardData> {
+  return getDashboardDataWithDependencies(userId, focusWindow, {
+    hasDatabase: hasDatabaseUrl,
+    buildMockData: (window) => buildMockDashboardData(window, scenario),
+    loadDashboardQuerySourceData,
+  });
 }

@@ -54,7 +54,7 @@ test.describe("Stage 4 operational smoke", () => {
     await page.goto("/sign-in");
     await expect(page.getByText("Sign in to Cadence")).toBeVisible();
 
-    for (let attempt = 0; attempt < 7; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       await page.getByLabel("Email").fill("demo@cadence.app");
       await page.getByLabel("Password").fill("definitely-wrong-password");
       await page.getByRole("button", { name: "Continue to dashboard" }).click();

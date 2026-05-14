@@ -70,6 +70,7 @@ type MoodReflectionWorkspaceProps = {
     sourceLabel: string;
     windowLabel: string;
   } | null;
+  readOnlyDemo?: boolean;
 };
 
 type DraftPeriod = MoodReflectionPeriod;
@@ -157,6 +158,7 @@ export function MoodReflectionWorkspace({
   data,
   openTodayComposerOnLoad = false,
   focusContext = null,
+  readOnlyDemo = false,
 }: MoodReflectionWorkspaceProps) {
   const router = useRouter();
   const initialEditorEntry = openTodayComposerOnLoad ? data.todayEntry : null;
@@ -240,6 +242,9 @@ export function MoodReflectionWorkspace({
   };
 
   const openEditor = (entry: MoodReflectionEntry | null) => {
+    if (readOnlyDemo) {
+      return;
+    }
     resetEditor(entry);
     setIsEditorOpen(true);
   };
@@ -348,7 +353,7 @@ export function MoodReflectionWorkspace({
     <div className="space-y-8">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-3xl space-y-3">
-          <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
+          <p className="font-geist text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
             Complete day reflections
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
@@ -363,7 +368,10 @@ export function MoodReflectionWorkspace({
           <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.22em]">
             {data.dataSource === "database" ? "Reflection editor live" : "Mock preview"}
           </Badge>
-          <Button className="rounded-full" onClick={() => openEditor(data.todayEntry)}>
+          {readOnlyDemo ? (
+            <p className="text-sm text-muted-foreground">Shared demo is preview-only. Reflection editing is disabled.</p>
+          ) : null}
+          <Button className="rounded-full" onClick={() => openEditor(data.todayEntry)} disabled={readOnlyDemo}>
             <Plus className="size-4" />
             {hasTodayDraft ? "Resume today's draft" : data.todayEntry ? "Edit today" : "Complete today"}
           </Button>
@@ -412,17 +420,17 @@ export function MoodReflectionWorkspace({
                         Last 14 days
                       </Badge>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-7 xl:grid-cols-14">
+                    <div className="grid grid-cols-7 gap-2">
                       {data.contextTimeline.map((point) => (
                         <div
                           key={point.dateIso}
-                          className={`rounded-[18px] border px-3 py-3 ${getTimelineTone(point.dominantSentiment)}`}
+                          className={`min-w-0 rounded-[12px] sm:rounded-[18px] border p-2 sm:px-3 sm:py-3 ${getTimelineTone(point.dominantSentiment)}`}
                         >
-                          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{point.day}</p>
-                          <p className="mt-2 text-sm font-medium text-foreground">
+                          <p className="truncate text-[9px] sm:text-[11px] uppercase tracking-widest text-muted-foreground">{point.day}</p>
+                          <p className="mt-1 sm:mt-2 truncate text-xs sm:text-sm font-medium text-foreground">
                             {point.activeCount ? `${point.activeCount} event${point.activeCount === 1 ? "" : "s"}` : "Clear"}
                           </p>
-                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                          <p className="mt-1 line-clamp-2 text-[10px] sm:text-xs leading-4 sm:leading-5 text-muted-foreground">
                             {point.dominantTitle ?? "No major context logged."}
                           </p>
                         </div>
@@ -447,7 +455,7 @@ export function MoodReflectionWorkspace({
           <CardContent className="space-y-5">
             {currentEntry ? (
               <>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                   <div className="rounded-[24px] border border-border/40 bg-background/50 p-4">
                     <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Stability</p>
                     <p className="mt-2 text-2xl font-semibold tracking-tight">{currentEntry.moodStability ?? "-"}</p>
@@ -483,11 +491,11 @@ export function MoodReflectionWorkspace({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-foreground">Timeline</p>
-                    <Button variant="ghost" className="rounded-full px-3" onClick={() => openEditor(currentEntry)}>
+                    <Button variant="ghost" className="rounded-full px-3" onClick={() => openEditor(currentEntry)} disabled={readOnlyDemo}>
                       Edit day
                     </Button>
                   </div>
-                  <div className="flex overflow-hidden rounded-[24px] border border-border/40 bg-background/60">
+                  <div className="flex overflow-x-auto snap-x snap-mandatory rounded-[24px] border border-border/40 bg-background/60 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {currentEntry.periods.map((period) => {
                       const width = ((period.endMinute - period.startMinute) / TOTAL_DAY_MINUTES) * 100;
                       const moodColor = getMoodColorToken(period.score);
@@ -496,14 +504,15 @@ export function MoodReflectionWorkspace({
                         <button
                           type="button"
                           key={period.id}
-                          className="min-h-24 border-r border-background/40 p-3 text-left last:border-r-0"
+                          className="min-h-24 min-w-[140px] shrink-0 snap-start border-r border-background/40 p-3 text-left last:border-r-0 disabled:cursor-not-allowed disabled:opacity-70"
+                          disabled={readOnlyDemo}
                           style={{
-                            width: `${Math.max(width, 18)}%`,
+                            width: `${Math.max(width, 25)}%`,
                             background: `linear-gradient(180deg, color-mix(in oklab, ${moodColor} 30%, transparent), color-mix(in oklab, ${moodColor} 12%, transparent))`,
                           }}
                           onClick={() => openEditor(currentEntry)}
                         >
-                          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                          <p className="min-h-[30px] text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
                             {formatMinuteLabel(period.startMinute)} - {formatMinuteLabel(period.endMinute)}
                           </p>
                           <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{period.score}</p>
@@ -578,7 +587,8 @@ export function MoodReflectionWorkspace({
                 <button
                   type="button"
                   key={entry.id}
-                  className="w-full rounded-[24px] border border-border/40 bg-background/50 p-4 text-left transition hover:bg-background/70"
+                  className="w-full rounded-[24px] border border-border/40 bg-background/50 p-4 text-left transition hover:bg-background/70 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={readOnlyDemo}
                   onClick={() => openEditor(entry)}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -1028,7 +1038,7 @@ export function MoodReflectionWorkspace({
                   <Button variant="outline" className="rounded-full" onClick={() => setIsEditorOpen(false)}>
                     Cancel
                   </Button>
-                  <Button className="rounded-full" disabled={isPending || !periods.length} onClick={handleSubmitReflection}>
+                  <Button className="rounded-full" disabled={isPending || !periods.length || readOnlyDemo} onClick={handleSubmitReflection}>
                     <Save className="size-4" />
                     Save day
                   </Button>

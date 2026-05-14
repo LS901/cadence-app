@@ -68,6 +68,31 @@ test("buildLifeEventDayExposureRows expands ongoing events through the reference
   assert.equal(rows[2]?.weightedImpact, 1);
 });
 
+test("buildLifeEventDayExposureRows splits cross-midnight events and clamps severity into each row", () => {
+  const rows = buildLifeEventDayExposureRows([
+    createEvent({
+      id: "event-overnight",
+      startAt: new Date(2030, 4, 1, 23, 30, 0),
+      endAt: new Date(2030, 4, 2, 0, 30, 0),
+      severityScore: 9,
+      sentiment: "MIXED",
+      tags: ["travel"],
+    }),
+  ]);
+
+  assert.equal(rows.length, 2);
+  assertLocalDayParts(rows[0]!.day, 2030, 4, 1);
+  assert.equal(rows[0]?.overlapMinutes, 30);
+  assert.equal(rows[0]?.overlapRatio, 0.0208);
+  assert.equal(rows[0]?.severityScore, 5);
+  assert.equal(rows[0]?.weightedImpact, 0.021);
+  assertLocalDayParts(rows[1]!.day, 2030, 4, 2);
+  assert.equal(rows[1]?.overlapMinutes, 30);
+  assert.equal(rows[1]?.overlapRatio, 0.0208);
+  assert.equal(rows[1]?.severityScore, 5);
+  assert.equal(rows[1]?.weightedImpact, 0.021);
+});
+
 test("syncLifeEventDayExposuresForEvent deletes old rows and writes regenerated rows", async () => {
   const operations: Array<{ type: string; payload: unknown }> = [];
   const event = createEvent({

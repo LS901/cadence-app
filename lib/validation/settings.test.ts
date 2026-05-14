@@ -5,11 +5,11 @@ import { settingsProfileSchema } from "./settings";
 
 test("settingsProfileSchema accepts a trimmed valid profile payload", () => {
   const parsed = settingsProfileSchema.parse({
-    name: "  Lewis Carter  ",
+    name: "  Demo Carter  ",
     timezone: "Europe/London",
   });
 
-  assert.equal(parsed.name, "Lewis Carter");
+  assert.equal(parsed.name, "Demo Carter");
   assert.equal(parsed.timezone, "Europe/London");
 });
 
@@ -37,7 +37,7 @@ test("settingsProfileSchema rejects unsupported timezones", () => {
   assert.throws(
     () =>
       settingsProfileSchema.parse({
-        name: "Lewis Carter",
+        name: "Demo Carter",
         timezone: "Europe/Paris",
       }),
     ZodError

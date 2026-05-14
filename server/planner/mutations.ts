@@ -90,6 +90,10 @@ export async function upsertActivity(values: unknown, dependencies: PlannerMutat
         id: true,
         recurrenceGroupId: true,
         isRecurringGenerated: true,
+        experimentHypothesis: true,
+        experimentObservationPrompt: true,
+        experimentReviewWindowDays: true,
+        experimentUncertaintyNote: true,
       },
     });
 
@@ -104,6 +108,14 @@ export async function upsertActivity(values: unknown, dependencies: PlannerMutat
       data: {
         ...normalizedValues,
         templateId,
+        experimentHypothesis:
+          normalizedValues.experimentHypothesis ?? existingActivity.experimentHypothesis ?? null,
+        experimentObservationPrompt:
+          normalizedValues.experimentObservationPrompt ?? existingActivity.experimentObservationPrompt ?? null,
+        experimentReviewWindowDays:
+          normalizedValues.experimentReviewWindowDays ?? existingActivity.experimentReviewWindowDays ?? null,
+        experimentUncertaintyNote:
+          normalizedValues.experimentUncertaintyNote ?? existingActivity.experimentUncertaintyNote ?? null,
         recurrenceGroupId:
           normalizedValues.recurring && !existingActivity.isRecurringGenerated
             ? existingActivity.recurrenceGroupId ?? existingActivity.id
@@ -208,6 +220,10 @@ export async function updateActivityStatus(
       scheduledAt: true,
       completedAt: true,
       completionMoodScore: true,
+      experimentHypothesis: true,
+      experimentOutcome: true,
+      experimentOutcomeNote: true,
+      experimentReviewedAt: true,
       recurrenceGroupId: true,
       isRecurringGenerated: true,
     },
@@ -238,6 +254,18 @@ export async function updateActivityStatus(
               normalizedValues.completionMoodScore ??
               existingActivity.completionMoodScore ??
               null,
+            experimentOutcome: existingActivity.experimentHypothesis
+              ? normalizedValues.experimentOutcome ?? existingActivity.experimentOutcome ?? null
+              : null,
+            experimentOutcomeNote: existingActivity.experimentHypothesis
+              ? normalizedValues.experimentOutcomeNote ?? existingActivity.experimentOutcomeNote ?? null
+              : null,
+            experimentReviewedAt: existingActivity.experimentHypothesis && (
+              normalizedValues.experimentOutcome !== undefined ||
+              normalizedValues.experimentOutcomeNote !== undefined
+            )
+              ? now
+              : existingActivity.experimentReviewedAt ?? null,
           }
         : nextStatus === "SKIPPED"
           ? {
@@ -245,12 +273,18 @@ export async function updateActivityStatus(
               skippedAt: now,
               completedAt: null,
               completionMoodScore: null,
+              experimentOutcome: null,
+              experimentOutcomeNote: null,
+              experimentReviewedAt: null,
             }
           : {
               status: nextStatus,
               completedAt: null,
               skippedAt: null,
               completionMoodScore: null,
+              experimentOutcome: null,
+              experimentOutcomeNote: null,
+              experimentReviewedAt: null,
             },
   });
 

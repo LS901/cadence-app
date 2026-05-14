@@ -12,7 +12,7 @@ import {
   getLifeEventSeverityLabel,
   isLifeEventActive,
 } from "@/lib/life-events";
-import { mockLifeEvents } from "@/lib/data/mock-cadence";
+import { mockLifeEvents, type MockLifeEvent } from "@/lib/data/mock-cadence";
 import { buildLifeEventDayExposureRows } from "@/server/life-events/day-exposures";
 import type {
   AnalyticsLifeEvent,
@@ -127,8 +127,8 @@ function isRecoverablePrismaError(error: unknown) {
   );
 }
 
-export function buildMockLifeEventRecords(): LifeEventRecord[] {
-  return mockLifeEvents.map((event) => ({
+export function buildMockLifeEventRecordsFromEvents(events: MockLifeEvent[]): LifeEventRecord[] {
+  return events.map((event) => ({
     ...event,
     customCategoryLabel: event.customCategoryLabel ?? null,
     description: event.description ?? null,
@@ -138,6 +138,10 @@ export function buildMockLifeEventRecords(): LifeEventRecord[] {
     source: "MANUAL" as const,
     recurrenceSeries: null,
   }));
+}
+
+export function buildMockLifeEventRecords(): LifeEventRecord[] {
+  return buildMockLifeEventRecordsFromEvents(mockLifeEvents);
 }
 
 export function buildLifeEventsContextData(

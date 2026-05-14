@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
+import { isReadOnlyDemoSession } from "@/lib/auth/read-only-demo";
 import { demoUser } from "@/lib/data/mock-cadence";
+import { normalizeMockScenario } from "@/lib/data/mock-scenarios";
 import { MoodReflectionWorkspace } from "@/features/mood/components/mood-reflection-workspace";
 import { getMoodPageData } from "@/server/mood/queries";
 
@@ -9,6 +11,7 @@ type MoodPageProps = {
     source?: string | string[];
     windowStart?: string | string[];
     windowEnd?: string | string[];
+    scenario?: string | string[];
   }>;
 };
 
@@ -36,6 +39,7 @@ function getWindowLabel(windowStart: string | undefined, windowEnd: string | und
 
 export default async function MoodPage({ searchParams }: MoodPageProps) {
   const session = await auth();
+  const readOnlyDemo = isReadOnlyDemoSession(session);
   const userId = session?.user?.id ?? demoUser.id;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const composeParam = resolvedSearchParams?.compose;
@@ -44,13 +48,14 @@ export default async function MoodPage({ searchParams }: MoodPageProps) {
     : composeParam === "today";
   const windowStart = getSingleParam(resolvedSearchParams?.windowStart);
   const windowEnd = getSingleParam(resolvedSearchParams?.windowEnd);
+  const scenario = normalizeMockScenario(getSingleParam(resolvedSearchParams?.scenario) ?? null);
   const focusWindow = windowStart && windowEnd
     ? {
         start: new Date(windowStart),
         end: new Date(windowEnd),
       }
     : null;
-  const data = await getMoodPageData(userId, focusWindow);
+  const data = await getMoodPageData(userId, focusWindow, scenario);
   const windowLabel = getWindowLabel(
     windowStart,
     windowEnd
@@ -62,5 +67,5 @@ export default async function MoodPage({ searchParams }: MoodPageProps) {
       }
     : null;
 
-  return <MoodReflectionWorkspace data={data} openTodayComposerOnLoad={openTodayComposerOnLoad} focusContext={focusContext} />;
+  return <MoodReflectionWorkspace data={data} openTodayComposerOnLoad={!readOnlyDemo && openTodayComposerOnLoad} focusContext={focusContext} readOnlyDemo={readOnlyDemo} />;
 }

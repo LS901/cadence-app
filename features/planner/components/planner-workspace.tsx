@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
@@ -8,7 +9,7 @@ import { format } from "date-fns";
 import { CalendarClock, CalendarDays, Check, CircleDashed, History, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -41,6 +42,7 @@ import {
   getInsightSurfacePresentation,
 } from "@/features/insights/lib/highlight-presentation";
 import { PageIntro } from "@/features/shared/components/page-intro";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { lifeEventOverlapsDay } from "@/lib/life-events";
 import { cn } from "@/lib/utils";
 import {
@@ -65,6 +67,10 @@ type PlannerWorkspaceProps = {
   insightState?: PlannerInsightState;
   suggestedActivityDraft?: PlannerSuggestedActivityDraft | null;
   openSuggestedDraftOnLoad?: boolean;
+  entryMode?: "guided-demo" | null;
+  entrySource?: string | null;
+  scenario?: MockScenarioKey;
+  readOnlyDemo?: boolean;
 };
 
 type ActivitySheetMode = "planned" | "retrospective" | "edit";
@@ -77,6 +83,7 @@ type ActivitySheetProps = {
   activityHistory: PlannerActivityHistory[];
   lifeEvents: LifeEventItem[];
   suggestedDraft?: PlannerSuggestedActivityDraft | null;
+  readOnlyDemo?: boolean;
 };
 
 type CompletionDialogProps = {
@@ -86,6 +93,11 @@ type CompletionDialogProps = {
   historyItem?: PlannerActivityHistory;
   moodScore: string;
   onMoodScoreChange: (value: string) => void;
+  experimentOutcome: "" | "SUPPORTED" | "MIXED" | "NOT_SUPPORTED";
+  onExperimentOutcomeChange: (value: "" | "SUPPORTED" | "MIXED" | "NOT_SUPPORTED") => void;
+  experimentOutcomeNote: string;
+  onExperimentOutcomeNoteChange: (value: string) => void;
+  readOnlyDemo?: boolean;
 };
 
 function getEmptyActivityValues(
@@ -153,30 +165,30 @@ function getActivityDefaults(
 
 function getStatusBadgeClassName(status: PlannerActivityItem["status"]) {
   if (status === "COMPLETED") {
-    return "bg-emerald-500/15 text-emerald-200";
+    return "border-emerald-500/25 bg-emerald-500/14 text-emerald-800 dark:text-emerald-200";
   }
 
   if (status === "SKIPPED") {
-    return "bg-amber-500/15 text-amber-100";
+    return "border-amber-500/25 bg-amber-500/14 text-amber-800 dark:text-amber-100";
   }
 
-  return "bg-sky-500/15 text-sky-100";
+  return "border-sky-500/25 bg-sky-500/14 text-sky-800 dark:text-sky-100";
 }
 
 function getCategoryBadgeClassName(category: PlannerActivityItem["category"]) {
   if (category === "EXERCISE" || category === "MINDFULNESS") {
-    return "border-emerald-400/20 bg-emerald-500/10 text-emerald-100";
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-100";
   }
 
   if (category === "SOCIAL" || category === "CREATIVE") {
-    return "border-rose-400/20 bg-rose-500/10 text-rose-100";
+    return "border-rose-500/25 bg-rose-500/10 text-rose-800 dark:text-rose-100";
   }
 
   if (category === "SLEEP") {
-    return "border-indigo-400/20 bg-indigo-500/10 text-indigo-100";
+    return "border-indigo-500/25 bg-indigo-500/10 text-indigo-800 dark:text-indigo-100";
   }
 
-  return "border-border/40 bg-white/6 text-foreground";
+  return "border-border/50 bg-background/80 text-foreground dark:bg-white/6";
 }
 
 function formatEnumLabel(value: string) {
@@ -225,6 +237,38 @@ function getContextToneClassName(sentiment: string | null) {
   return "border-border/40 bg-background/45 text-muted-foreground";
 }
 
+function getExperimentOutcomeLabel(outcome: PlannerActivityItem["experimentOutcome"] | "") {
+  if (outcome === "SUPPORTED") {
+    return "Supported";
+  }
+
+  if (outcome === "MIXED") {
+    return "Mixed";
+  }
+
+  if (outcome === "NOT_SUPPORTED") {
+    return "Not supported";
+  }
+
+  return "Pending review";
+}
+
+function getExperimentOutcomeClassName(outcome: PlannerActivityItem["experimentOutcome"] | "") {
+  if (outcome === "SUPPORTED") {
+    return "border-[color:color-mix(in_oklab,var(--mood-4)_28%,transparent)] bg-[color:color-mix(in_oklab,var(--mood-4)_12%,transparent)] text-foreground";
+  }
+
+  if (outcome === "MIXED") {
+    return "border-[color:color-mix(in_oklab,var(--mood-3)_28%,transparent)] bg-[color:color-mix(in_oklab,var(--mood-3)_12%,transparent)] text-foreground";
+  }
+
+  if (outcome === "NOT_SUPPORTED") {
+    return "border-[color:color-mix(in_oklab,var(--mood-2)_28%,transparent)] bg-[color:color-mix(in_oklab,var(--mood-2)_12%,transparent)] text-foreground";
+  }
+
+  return "border-border/40 bg-background/35 text-muted-foreground";
+}
+
 function getDraftLifeEvents(scheduledAtValue: string, lifeEvents: LifeEventItem[]) {
   if (!scheduledAtValue) {
     return [];
@@ -258,6 +302,7 @@ function ActivitySheet({
   activityHistory,
   lifeEvents,
   suggestedDraft,
+  readOnlyDemo = false,
 }: ActivitySheetProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -332,10 +377,29 @@ function ActivitySheet({
   }, [form, selectedHistory]);
 
   const handleSubmit = (values: ActivityFormValues) => {
+    const experimentValues = activity
+      ? {
+          experimentHypothesis: activity.experimentHypothesis ?? "",
+          experimentObservationPrompt: activity.experimentObservationPrompt ?? "",
+          experimentReviewWindowDays: activity.experimentReviewWindowDays
+            ? String(activity.experimentReviewWindowDays)
+            : "",
+          experimentUncertaintyNote: activity.experimentUncertaintyNote ?? "",
+        }
+      : suggestedDraft
+        ? {
+            experimentHypothesis: suggestedDraft.hypothesis,
+            experimentObservationPrompt: suggestedDraft.observationPrompt,
+            experimentReviewWindowDays: suggestedDraft.reviewWindowDays,
+            experimentUncertaintyNote: suggestedDraft.uncertaintyNote,
+          }
+        : {};
+
     startTransition(async () => {
       try {
         const result = await upsertActivityAction({
           ...values,
+          ...experimentValues,
           entryMode: isRetrospective ? "RETROSPECTIVE" : "PLANNED",
           id: activity?.id,
         });
@@ -378,7 +442,7 @@ function ActivitySheet({
           </SheetHeader>
 
           <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
-            {isSuggestedDraft ? (
+            {isSuggestedDraft && suggestedDraft ? (
               <div className="rounded-[24px] border border-primary/30 bg-primary/10 px-4 py-4 text-sm leading-6 text-foreground">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
                   Weekly review draft
@@ -386,6 +450,24 @@ function ActivitySheet({
                 <p className="mt-2">
                   This activity is prefilled from your weekly review so you can turn the carry-forward insight into an actual experiment on the calendar.
                 </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-[20px] border border-primary/20 bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Hypothesis</p>
+                    <p className="mt-2 text-sm leading-6 text-foreground">{suggestedDraft.hypothesis}</p>
+                  </div>
+                  <div className="rounded-[20px] border border-primary/20 bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">What to notice</p>
+                    <p className="mt-2 text-sm leading-6 text-foreground">{suggestedDraft.observationPrompt}</p>
+                  </div>
+                  <div className="rounded-[20px] border border-primary/20 bg-background/60 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Review window</p>
+                    <p className="mt-2 text-sm leading-6 text-foreground">
+                      Check back after {suggestedDraft.reviewWindowDays}{" "}
+                      {suggestedDraft.reviewWindowDays === "1" ? "day" : "days"}.
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">{suggestedDraft.uncertaintyNote}</p>
                 {suggestedHistoryMatch?.lastCompletedAtIso && suggestedScheduledAtValue ? (
                   <div className="mt-2 space-y-3 text-muted-foreground">
                     <p>
@@ -667,7 +749,7 @@ function ActivitySheet({
             >
               Cancel
             </Button>
-            <Button type="submit" className="rounded-full" disabled={isPending}>
+            <Button type="submit" className="rounded-full" disabled={isPending || readOnlyDemo}>
               {activity
                 ? "Save changes"
                 : isRetrospective
@@ -688,6 +770,11 @@ function CompletionDialog({
   historyItem,
   moodScore,
   onMoodScoreChange,
+  experimentOutcome,
+  onExperimentOutcomeChange,
+  experimentOutcomeNote,
+  onExperimentOutcomeNoteChange,
+  readOnlyDemo = false,
 }: CompletionDialogProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -703,6 +790,8 @@ function CompletionDialog({
           id: activity.id,
           status: "COMPLETED",
           completionMoodScore: moodScore,
+          experimentOutcome,
+          experimentOutcomeNote,
         });
 
         toast.success("Activity marked complete.");
@@ -717,16 +806,21 @@ function CompletionDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8 backdrop-blur-sm">
-      <Card className="glass-card w-full max-w-md rounded-[28px] border-border/40">
-        <CardHeader className="space-y-2">
-          <CardDescription>Complete activity</CardDescription>
-          <CardTitle className="text-2xl text-foreground">{activity.title}</CardTitle>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Capture the mood after finishing this activity so repeated entries become more useful for future insights.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="center"
+        showCloseButton={false}
+        className="border-none bg-transparent p-0 shadow-none data-[side=center]:h-auto data-[side=center]:max-h-[calc(100vh-4rem)] data-[side=center]:w-[min(96vw,32rem)] data-[side=center]:overflow-visible"
+      >
+        <Card className="glass-card max-h-[calc(100vh-4rem)] w-full overflow-y-auto rounded-[28px] border-border/40 bg-card/95">
+          <SheetHeader className="space-y-2 p-6">
+            <p className="text-sm text-muted-foreground">Complete activity</p>
+            <SheetTitle className="text-2xl text-foreground">{activity.title}</SheetTitle>
+            <SheetDescription className="text-sm leading-6 text-muted-foreground">
+              Capture the mood after finishing this activity so repeated entries become more useful for future insights.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-6 pb-6">
           {historyItem ? (
             <div className="rounded-[22px] border border-border/40 bg-background/35 px-4 py-3 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Previous history</p>
@@ -743,11 +837,54 @@ function CompletionDialog({
             <Input
               id="completionMoodScoreDialog"
               inputMode="numeric"
+              autoFocus
               placeholder="78"
               value={moodScore}
               onChange={(event) => onMoodScoreChange(event.target.value)}
             />
           </div>
+
+          {activity.experimentHypothesis ? (
+            <div className="space-y-4 rounded-[22px] border border-primary/20 bg-primary/8 px-4 py-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Observation</p>
+                <p className="mt-2 text-sm leading-6 text-foreground">
+                  {activity.experimentObservationPrompt ?? "Notice what changes after the activity."}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Hypothesis</p>
+                <p className="mt-2 text-sm leading-6 text-foreground">{activity.experimentHypothesis}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="experimentOutcomeDialog">Tested support</Label>
+                <select
+                  id="experimentOutcomeDialog"
+                  className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  value={experimentOutcome}
+                  onChange={(event) => onExperimentOutcomeChange(event.target.value as "" | "SUPPORTED" | "MIXED" | "NOT_SUPPORTED")}
+                >
+                  <option value="" className="bg-card text-foreground">Not reviewed yet</option>
+                  <option value="SUPPORTED" className="bg-card text-foreground">Supported</option>
+                  <option value="MIXED" className="bg-card text-foreground">Mixed</option>
+                  <option value="NOT_SUPPORTED" className="bg-card text-foreground">Not supported</option>
+                </select>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Record whether the expected effect actually showed up after this activity.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="experimentOutcomeNoteDialog">Follow-through note</Label>
+                <Textarea
+                  id="experimentOutcomeNoteDialog"
+                  rows={3}
+                  placeholder="What happened after the activity?"
+                  value={experimentOutcomeNote}
+                  onChange={(event) => onExperimentOutcomeNoteChange(event.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button
@@ -762,16 +899,17 @@ function CompletionDialog({
             <Button
               type="button"
               className="rounded-full"
-              disabled={isPending}
+              disabled={isPending || readOnlyDemo}
               onClick={handleComplete}
             >
               <Save className="size-4" />
               Save completion
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        </Card>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -779,10 +917,12 @@ function ActivityCardActions({
   activity,
   onOpenCompletion,
   onEdit,
+  readOnlyDemo = false,
 }: {
   activity: PlannerActivityItem;
   onOpenCompletion: () => void;
   onEdit: () => void;
+  readOnlyDemo?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -837,13 +977,29 @@ function ActivityCardActions({
         </div>
       ) : null}
 
+      {activity.experimentHypothesis ? (
+        <div className="space-y-2 rounded-[20px] border border-border/40 bg-background/35 p-4 text-sm">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Hypothesis</p>
+          <p className="text-sm leading-6 text-foreground">{activity.experimentHypothesis}</p>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Tested support</p>
+          <div className={cn("inline-flex rounded-full border px-3 py-2 text-xs", getExperimentOutcomeClassName(activity.experimentOutcome ?? ""))}>
+            {getExperimentOutcomeLabel(activity.experimentOutcome ?? "")}
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {activity.experimentOutcomeNote
+              ? activity.experimentOutcomeNote
+              : "Complete the activity and record whether the expected effect showed up."}
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         {activity.status === "COMPLETED" ? (
           <Button
             type="button"
             size="xs"
             className="rounded-full"
-            disabled={isPending}
+            disabled={isPending || readOnlyDemo}
             onClick={onOpenCompletion}
           >
             <Check className="size-4" />
@@ -854,7 +1010,7 @@ function ActivityCardActions({
             type="button"
             size="xs"
             className="rounded-full"
-            disabled={isPending}
+            disabled={isPending || readOnlyDemo}
             onClick={onOpenCompletion}
           >
             <Check className="size-4" />
@@ -868,7 +1024,7 @@ function ActivityCardActions({
             size="xs"
             variant="outline"
             className="rounded-full"
-            disabled={isPending}
+            disabled={isPending || readOnlyDemo}
             onClick={() => handleStatusChange("SKIPPED")}
           >
             <X className="size-4" />
@@ -882,7 +1038,7 @@ function ActivityCardActions({
             size="xs"
             variant="ghost"
             className="rounded-full"
-            disabled={isPending}
+            disabled={isPending || readOnlyDemo}
             onClick={() => handleStatusChange("SCHEDULED")}
           >
             <CircleDashed className="size-4" />
@@ -897,7 +1053,7 @@ function ActivityCardActions({
           size="xs"
           variant="ghost"
           className="rounded-full"
-          disabled={isPending}
+          disabled={isPending || readOnlyDemo}
           onClick={onEdit}
         >
           <Pencil className="size-4" />
@@ -908,7 +1064,7 @@ function ActivityCardActions({
           size="xs"
           variant="ghost"
           className="rounded-full text-destructive hover:text-destructive"
-          disabled={isPending}
+          disabled={isPending || readOnlyDemo}
           onClick={handleDelete}
         >
           <Trash2 className="size-4" />
@@ -925,6 +1081,10 @@ export function PlannerWorkspace({
   insightState,
   suggestedActivityDraft = null,
   openSuggestedDraftOnLoad = false,
+  entryMode = null,
+  entrySource = null,
+  scenario = defaultMockScenario,
+  readOnlyDemo = false,
 }: PlannerWorkspaceProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(openSuggestedDraftOnLoad && Boolean(suggestedActivityDraft));
   const [sheetMode, setSheetMode] = useState<ActivitySheetMode>("planned");
@@ -934,11 +1094,23 @@ export function PlannerWorkspace({
   );
   const [completionTarget, setCompletionTarget] = useState<PlannerActivityItem | null>(null);
   const [completionMoodScore, setCompletionMoodScore] = useState("");
+  const [completionExperimentOutcome, setCompletionExperimentOutcome] = useState<"" | "SUPPORTED" | "MIXED" | "NOT_SUPPORTED">("");
+  const [completionExperimentOutcomeNote, setCompletionExperimentOutcomeNote] = useState("");
   const insightSurfacePresentation = getInsightSurfacePresentation({
     surface: "planner",
     mode: insightState?.mode ?? "EMPTY",
     nullState: insightState?.nullState ?? null,
   });
+  const guidedDashboardParams = new URLSearchParams({ entry: "guided-demo" });
+  const guidedJournalParams = new URLSearchParams({ entry: "guided-demo", source: "planner" });
+
+  if (scenario !== defaultMockScenario) {
+    guidedDashboardParams.set("scenario", scenario);
+    guidedJournalParams.set("scenario", scenario);
+  }
+
+  const guidedDashboardHref = `/dashboard?${guidedDashboardParams.toString()}`;
+  const guidedJournalHref = `/journal?${guidedJournalParams.toString()}`;
 
   const activityHistoryMap = useMemo(
     () =>
@@ -949,6 +1121,9 @@ export function PlannerWorkspace({
   );
 
   const openCreateSheet = () => {
+    if (readOnlyDemo) {
+      return;
+    }
     setSheetMode("planned");
     setSelectedActivity(null);
     setSheetDraft(null);
@@ -956,7 +1131,7 @@ export function PlannerWorkspace({
   };
 
   const openSuggestedDraftSheet = () => {
-    if (!suggestedActivityDraft) {
+    if (!suggestedActivityDraft || readOnlyDemo) {
       return;
     }
 
@@ -967,6 +1142,9 @@ export function PlannerWorkspace({
   };
 
   const openRetrospectiveSheet = () => {
+    if (readOnlyDemo) {
+      return;
+    }
     setSheetMode("retrospective");
     setSelectedActivity(null);
     setSheetDraft(null);
@@ -974,6 +1152,9 @@ export function PlannerWorkspace({
   };
 
   const openEditSheet = (activity: PlannerActivityItem) => {
+    if (readOnlyDemo) {
+      return;
+    }
     setSheetMode("edit");
     setSelectedActivity(activity);
     setSheetDraft(null);
@@ -981,10 +1162,15 @@ export function PlannerWorkspace({
   };
 
   const openCompletionDialog = (activity: PlannerActivityItem) => {
+    if (readOnlyDemo) {
+      return;
+    }
     setCompletionTarget(activity);
     setCompletionMoodScore(
       activity.completionMoodScore ? String(activity.completionMoodScore) : ""
     );
+    setCompletionExperimentOutcome(activity.experimentOutcome ?? "");
+    setCompletionExperimentOutcomeNote(activity.experimentOutcomeNote ?? "");
   };
 
   return (
@@ -993,7 +1179,7 @@ export function PlannerWorkspace({
         <PageIntro
           eyebrow="Weekly planner"
           title="Shape the week before it shapes you."
-          description="Place activities into the week, update completion state in context, and log the mood shift that follows a finished block."
+          description="Place activities into the week, turn observations into hypotheses, and record tested support after the activity is finished."
         />
 
         <div className="flex flex-wrap items-center gap-3">
@@ -1003,22 +1189,77 @@ export function PlannerWorkspace({
           >
             {data.dataSource === "database" ? "Database connected" : "Mock preview"}
           </Badge>
-          <Button className="rounded-full" onClick={openCreateSheet}>
+          {readOnlyDemo ? (
+            <p className="text-sm text-muted-foreground">Shared demo is preview-only. Planning changes are disabled.</p>
+          ) : null}
+          <Button className="rounded-full" onClick={openCreateSheet} disabled={readOnlyDemo}>
             <Plus className="size-4" />
             Add activity
           </Button>
           {suggestedActivityDraft ? (
-            <Button className="rounded-full" variant="outline" onClick={openSuggestedDraftSheet}>
+            <Button className="rounded-full" variant="outline" onClick={openSuggestedDraftSheet} disabled={readOnlyDemo}>
               <Pencil className="size-4" />
               Use weekly review draft
             </Button>
           ) : null}
-          <Button className="rounded-full" variant="outline" onClick={openRetrospectiveSheet}>
+          <Button className="rounded-full" variant="outline" onClick={openRetrospectiveSheet} disabled={readOnlyDemo}>
             <History className="size-4" />
             Add retrospective
           </Button>
         </div>
       </div>
+
+      {entryMode === "guided-demo" ? (
+        <Card className="glass-card rounded-[32px] border-primary/20 bg-primary/[0.04]">
+          <CardContent className="grid gap-5 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Guided demo path · Step 2 of 4</p>
+              <p className="mt-3 text-xl font-semibold tracking-tight text-foreground">Turn the weekly review into a concrete experiment on the calendar.</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {entrySource === "dashboard"
+                  ? "You arrived from the dashboard synthesis. Use the review draft to schedule one testable activity, then continue into Journal before closing the loop in Insights."
+                  : "Use Planner as the bridge between review and reflection: schedule the experiment here, then keep the story coherent in Journal before you interpret what changed in Insights."}
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {[
+                "1. Review the carry-forward draft and place one activity into the week.",
+                "2. Complete it later with a mood score and tested-support note.",
+                "3. Continue into Journal, then use Insights to compare support, context, and signal strength.",
+              ].map((item) => (
+                <div key={item} className="rounded-[24px] border border-border/40 bg-background/65 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                  {item}
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-3 pt-1">
+                {suggestedActivityDraft ? (
+                  <Button className="rounded-full" onClick={openSuggestedDraftSheet} disabled={readOnlyDemo}>
+                    Use weekly review draft
+                  </Button>
+                ) : null}
+                <Link
+                  href={guidedJournalHref}
+                  className={buttonVariants({
+                    variant: "outline",
+                    className: "rounded-full border-border/40 bg-transparent",
+                  })}
+                >
+                  Continue into Journal context
+                </Link>
+                <Link
+                  href={guidedDashboardHref}
+                  className={buttonVariants({
+                    variant: "outline",
+                    className: "rounded-full border-border/40 bg-transparent",
+                  })}
+                >
+                  Re-open weekly review
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="glass-card rounded-[32px]">
         <CardHeader className="space-y-3">
@@ -1049,7 +1290,7 @@ export function PlannerWorkspace({
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-muted-foreground">
+                    <p className="font-geist text-[11px] uppercase tracking-[0.26em] text-muted-foreground">
                       {day.shortLabel}
                     </p>
                     <p className="mt-2 text-lg font-semibold text-foreground">
@@ -1147,6 +1388,32 @@ export function PlannerWorkspace({
                             </p>
                           ) : null}
 
+                          {activity.experimentHypothesis ? (
+                            <div className="mt-3 space-y-3 rounded-[20px] border border-primary/20 bg-primary/8 p-4">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Observation</p>
+                                <p className="mt-2 text-sm leading-6 text-foreground">
+                                  {activity.experimentObservationPrompt ?? "Notice what changes after the activity."}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Hypothesis</p>
+                                <p className="mt-2 text-sm leading-6 text-foreground">{activity.experimentHypothesis}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Tested support</p>
+                                <div className={cn("mt-2 inline-flex rounded-full border px-3 py-2 text-xs", getExperimentOutcomeClassName(activity.experimentOutcome ?? ""))}>
+                                  {getExperimentOutcomeLabel(activity.experimentOutcome ?? "")}
+                                </div>
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                  {activity.experimentOutcomeNote
+                                    ? activity.experimentOutcomeNote
+                                    : "This becomes tested support after completion review is saved."}
+                                </p>
+                              </div>
+                            </div>
+                          ) : null}
+
                           {activity.isFuture && activity.status === "SCHEDULED" ? (
                             <div className="mt-3 rounded-[18px] border border-border/40 bg-background/35 px-3 py-2 text-xs text-muted-foreground">
                               Completion becomes available when the scheduled time arrives.
@@ -1157,6 +1424,7 @@ export function PlannerWorkspace({
                             activity={activity}
                             onOpenCompletion={() => openCompletionDialog(activity)}
                             onEdit={() => openEditSheet(activity)}
+                            readOnlyDemo={readOnlyDemo}
                           />
                         </div>
                       );
@@ -1164,7 +1432,8 @@ export function PlannerWorkspace({
                   ) : (
                     <button
                       type="button"
-                      className="w-full rounded-[24px] border border-dashed border-border/40 bg-white/4 px-4 py-8 text-left transition hover:bg-white/6"
+                      className="w-full rounded-[24px] border border-dashed border-border/40 bg-background/70 px-4 py-8 text-left transition hover:bg-background/90 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/4 dark:hover:bg-white/6"
+                      disabled={readOnlyDemo}
                       onClick={openCreateSheet}
                     >
                       <p className="text-sm font-medium text-foreground">No activities yet</p>
@@ -1271,7 +1540,7 @@ export function PlannerWorkspace({
           </CardHeader>
           <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
             <p>Use Add activity for future plans and Add retrospective when something already happened.</p>
-            <p>Completion now opens a small mood dialog instead of writing directly into the card.</p>
+            <p>Completion now records both the post-activity mood and whether the hypothesis was supported, mixed, or not supported.</p>
             <p>Recurring activities can now store daily, weekly, or custom cadence details.</p>
             {insightHighlights.length ? (
               <div className="space-y-3 border-t border-border/40 pt-4">
@@ -1282,7 +1551,7 @@ export function PlannerWorkspace({
                         {insight.lagDays === 0 ? "Same day" : `${insight.lagDays}-day lag`}
                       </Badge>
                       <Badge variant="outline" className="rounded-full border-border/40 px-3 py-1 text-[11px] tracking-[0.08em] text-muted-foreground">
-                        {Math.round(insight.confidence * 100)}% confidence
+                        {Math.round(insight.confidence * 100)}% observation confidence
                       </Badge>
                       <Badge variant="outline" className="rounded-full border-border/40 px-3 py-1 text-[11px] tracking-[0.08em] text-muted-foreground">
                         {insight.evidenceLabel}
@@ -1321,6 +1590,7 @@ export function PlannerWorkspace({
         activityHistory={data.activityHistory}
         lifeEvents={data.lifeEvents}
         suggestedDraft={sheetDraft}
+        readOnlyDemo={readOnlyDemo}
       />
 
       <CompletionDialog
@@ -1329,6 +1599,8 @@ export function PlannerWorkspace({
           if (!open) {
             setCompletionTarget(null);
             setCompletionMoodScore("");
+            setCompletionExperimentOutcome("");
+            setCompletionExperimentOutcomeNote("");
           }
         }}
         activity={completionTarget}
@@ -1339,6 +1611,11 @@ export function PlannerWorkspace({
         }
         moodScore={completionMoodScore}
         onMoodScoreChange={setCompletionMoodScore}
+        experimentOutcome={completionExperimentOutcome}
+        onExperimentOutcomeChange={setCompletionExperimentOutcome}
+        experimentOutcomeNote={completionExperimentOutcomeNote}
+        onExperimentOutcomeNoteChange={setCompletionExperimentOutcomeNote}
+        readOnlyDemo={readOnlyDemo}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import type { PlannerData } from "@/features/planner/types";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { db, hasDatabaseUrl } from "@/lib/db";
 import { getLifeEventItems } from "@/server/life-events/queries";
 import {
@@ -10,10 +11,13 @@ import {
   getPlannerDataWithDependencies,
 } from "./query-service";
 
-export async function getPlannerData(userId: string): Promise<PlannerData> {
+export async function getPlannerData(
+  userId: string,
+  scenario: MockScenarioKey = defaultMockScenario
+): Promise<PlannerData> {
   return getPlannerDataWithDependencies(userId, {
     hasDatabase: hasDatabaseUrl,
-    buildMockPlannerData,
+    buildMockPlannerData: (currentUserId, now) => buildMockPlannerData(currentUserId, now, scenario),
     preparePlannerData: async (currentUserId) => {
       if (!db) {
         return;

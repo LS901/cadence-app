@@ -155,3 +155,34 @@ test("completeDayReflectionSchema accepts a persisted reflection payload with de
   assert.equal(parsed.periods[1]?.score, 74);
   assert.deepEqual(parsed.tags, ["balanced"]);
 });
+
+test("completeDayReflectionSchema rejects overlapping persisted mood periods on the later block", () => {
+  const result = completeDayReflectionSchema.safeParse({
+    day: new Date("2026-05-10T00:00:00.000Z"),
+    score: 66,
+    periods: [
+      {
+        startMinute: 480,
+        endMinute: 720,
+        score: 58,
+        tags: [],
+      },
+      {
+        startMinute: 700,
+        endMinute: 900,
+        score: 74,
+        tags: [],
+      },
+    ],
+    tags: [],
+  });
+
+  assert.equal(result.success, false);
+
+  if (result.success) {
+    return;
+  }
+
+  assert.equal(result.error.issues[0]?.message, "Mood blocks cannot overlap.");
+  assert.deepEqual(result.error.issues[0]?.path, ["periods", 1, "startMinute"]);
+});

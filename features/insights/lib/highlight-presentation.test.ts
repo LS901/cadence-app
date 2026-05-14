@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  formatInsightContextLine,
   formatInsightEvidenceLine,
+  getInsightConfidencePresentation,
   getInsightSurfacePresentation,
 } from "./highlight-presentation";
 
@@ -58,4 +60,21 @@ test("evidence line formatting stays stable across lightweight surfaces", () => 
     }),
     "4 of 8 relevant days align. This is still early and should not drive decisions yet."
   );
+});
+
+test("confidence presentation distinguishes stronger and weaker reads", () => {
+  assert.deepEqual(getInsightConfidencePresentation(0.82), {
+    label: "Higher confidence",
+    description: "Repeated enough to treat as a stronger lead rather than a fragile coincidence.",
+  });
+
+  assert.deepEqual(getInsightConfidencePresentation(0.42), {
+    label: "Lower confidence",
+    description: "Visible in the current window, but still too early or noisy to trust as a conclusion.",
+  });
+});
+
+test("context line formatting warns when context is heavily overlapping", () => {
+  assert.match(formatInsightContextLine(0.65), /softens the read/i);
+  assert.match(formatInsightContextLine(0), /comparatively cleaner/i);
 });

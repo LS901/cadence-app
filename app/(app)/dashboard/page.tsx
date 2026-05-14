@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { DashboardOverview } from "@/features/dashboard/components/dashboard-overview";
+import { normalizeMockScenario } from "@/lib/data/mock-scenarios";
 import { getDashboardData } from "@/server/dashboard/queries";
 
 type DashboardPageProps = {
@@ -8,6 +9,8 @@ type DashboardPageProps = {
     source?: string | string[];
     windowStart?: string | string[];
     windowEnd?: string | string[];
+    entry?: string | string[];
+    scenario?: string | string[];
   }>;
 };
 
@@ -40,13 +43,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const focus = getSingleParam(resolvedSearchParams?.focus);
   const windowStart = getSingleParam(resolvedSearchParams?.windowStart);
   const windowEnd = getSingleParam(resolvedSearchParams?.windowEnd);
+  const entry = getSingleParam(resolvedSearchParams?.entry);
+  const scenario = normalizeMockScenario(getSingleParam(resolvedSearchParams?.scenario) ?? null);
   const focusWindow = windowStart && windowEnd
     ? {
         start: new Date(windowStart),
         end: new Date(windowEnd),
       }
     : null;
-  const dashboardData = await getDashboardData(userId, focusWindow);
+  const dashboardData = await getDashboardData(userId, focusWindow, scenario);
   const windowLabel = getWindowLabel(
     windowStart,
     windowEnd
@@ -57,6 +62,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         windowLabel,
       }
     : null;
+  const isDemoWorkspace = userId === "demo-user" || (session?.user?.email ?? "").toLowerCase() === "demo@cadence.app";
 
-  return <DashboardOverview data={dashboardData} focusContext={focusContext} />;
+  return (
+    <DashboardOverview
+      data={dashboardData}
+      focusContext={focusContext}
+      entryMode={entry === "guided-demo" || isDemoWorkspace ? "guided-demo" : null}
+      scenario={scenario}
+    />
+  );
 }

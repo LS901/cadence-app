@@ -31,6 +31,7 @@ import { updateSettingsProfileAction } from "@/server/settings/actions";
 
 type SettingsWorkspaceProps = {
   data: SettingsSurface;
+  readOnlyDemo?: boolean;
 };
 
 type ProfileFormState = {
@@ -100,7 +101,7 @@ function PreferenceButton({
   );
 }
 
-export function SettingsWorkspace({ data }: SettingsWorkspaceProps) {
+export function SettingsWorkspace({ data, readOnlyDemo = false }: SettingsWorkspaceProps) {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
@@ -141,7 +142,7 @@ export function SettingsWorkspace({ data }: SettingsWorkspaceProps) {
   function handleSubmitProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (optimisticData.dataSource === "mock") {
+    if (optimisticData.dataSource === "mock" || readOnlyDemo) {
       toast.info("Profile saving is disabled in mock preview mode.");
       return;
     }
@@ -250,10 +251,11 @@ export function SettingsWorkspace({ data }: SettingsWorkspaceProps) {
                 <Input
                   id="settingsName"
                   value={profileState.name}
+                  disabled={readOnlyDemo}
                   onChange={(event) =>
                     setProfileState((current) => ({ ...current, name: event.target.value }))
                   }
-                  placeholder="Lewis Cadence"
+                  placeholder="Demo Cadence"
                 />
               </div>
 
@@ -268,6 +270,7 @@ export function SettingsWorkspace({ data }: SettingsWorkspaceProps) {
                   id="settingsTimezone"
                   className="flex h-11 w-full rounded-2xl border border-border/40 bg-background px-4 text-sm outline-none transition focus:border-primary/40"
                   value={profileState.timezone}
+                  disabled={readOnlyDemo}
                   onChange={(event) =>
                     setProfileState((current) => ({
                       ...current,
@@ -288,7 +291,7 @@ export function SettingsWorkspace({ data }: SettingsWorkspaceProps) {
               </div>
 
               <div className="flex flex-wrap justify-end gap-3">
-                <Button type="submit" className="rounded-full" disabled={isPending || optimisticData.dataSource === "mock"}>
+                <Button type="submit" className="rounded-full" disabled={isPending || optimisticData.dataSource === "mock" || readOnlyDemo}>
                   <Save className="size-4" />
                   Save profile
                 </Button>

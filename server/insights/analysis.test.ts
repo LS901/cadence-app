@@ -30,6 +30,7 @@ function createRow(overrides: Partial<DailyBehaviorFeatureRow>): DailyBehaviorFe
     negativeHabitsCompleted: 0,
     journalEntryCount: 0,
     journalSentimentScore: 50,
+    journalTitles: [],
     moodPeriodsCount: 3,
     activeLifeEventCount: 0,
     overlappingLifeEventCount: 0,
@@ -38,6 +39,7 @@ function createRow(overrides: Partial<DailyBehaviorFeatureRow>): DailyBehaviorFe
     neutralLifeEventLoad: 0,
     totalLifeEventLoad: 0,
     confoundedDay: false,
+    lifeEventTitles: [],
     lifeEventCategories: [],
     lifeEventTags: [],
     tags: [],
@@ -91,6 +93,31 @@ test("deriveInsightCandidates keeps raw and adjusted readings aligned when no da
   assert.equal(candidate.rawConfidence, candidate.adjustedConfidence);
   assert.equal(candidate.payload.confounderAdjusted, false);
   assert.match(candidate.adjustmentSummary, /aligned/i);
+});
+
+test("deriveInsightCandidates shows the pattern becoming clearer once context-heavy exposed days are discounted", () => {
+  const rows = [
+    createRow({ day: new Date("2026-05-01T00:00:00.000Z"), exerciseCompleted: 1, eveningMood: 46, moodScore: 46, confoundedDay: true }),
+    createRow({ day: new Date("2026-05-02T00:00:00.000Z"), exerciseCompleted: 1, eveningMood: 44, moodScore: 44, confoundedDay: true }),
+    createRow({ day: new Date("2026-05-03T00:00:00.000Z"), exerciseCompleted: 1, eveningMood: 90, moodScore: 90 }),
+    createRow({ day: new Date("2026-05-04T00:00:00.000Z"), exerciseCompleted: 1, eveningMood: 88, moodScore: 88 }),
+    createRow({ day: new Date("2026-05-05T00:00:00.000Z"), exerciseCompleted: 0, eveningMood: 42, moodScore: 42 }),
+    createRow({ day: new Date("2026-05-06T00:00:00.000Z"), exerciseCompleted: 0, eveningMood: 40, moodScore: 40 }),
+    createRow({ day: new Date("2026-05-07T00:00:00.000Z"), exerciseCompleted: 0, eveningMood: 38, moodScore: 38 }),
+    createRow({ day: new Date("2026-05-08T00:00:00.000Z"), exerciseCompleted: 0, eveningMood: 36, moodScore: 36 }),
+  ];
+
+  const candidate = deriveInsightCandidates(rows).find(
+    (entry) => entry.metric === "ACTIVITY_TO_MOOD"
+  );
+
+  assert.ok(candidate);
+  assert.ok(candidate.adjustedStrength > candidate.rawStrength);
+  assert.ok(candidate.rawConfidence > candidate.adjustedConfidence);
+  assert.equal(candidate.payload.confounderAdjusted, true);
+  assert.equal(candidate.payload.confoundedDayShare, 0.5);
+  assert.match(candidate.adjustmentSummary, /becomes clearer away from context-heavy days/i);
+  assert.match(candidate.uncertaintySummary, /context-heavy/i);
 });
 
 test("buildInsightAnalysisSnapshot keeps low-evidence patterns in an exploratory bucket instead of dropping them", () => {
@@ -264,6 +291,52 @@ test("social uncertainty copy warns that recovery may come from more than connec
   assert.match(candidate.uncertaintySummary, /connection itself|kind of plans/i);
 });
 
+test("deriveInsightCandidates can surface a life-event candidate with context-specific causality limits", () => {
+  const rows = [
+    createRow({ day: new Date("2026-05-01T00:00:00.000Z"), positiveLifeEventLoad: 0.9, totalLifeEventLoad: 0.9, activeLifeEventCount: 1, confoundedDay: true, moodScore: 90, eveningMood: 90 }),
+    createRow({ day: new Date("2026-05-02T00:00:00.000Z"), positiveLifeEventLoad: 0.8, totalLifeEventLoad: 0.8, activeLifeEventCount: 1, confoundedDay: true, moodScore: 84, eveningMood: 84 }),
+    createRow({ day: new Date("2026-05-03T00:00:00.000Z"), positiveLifeEventLoad: 0.7, totalLifeEventLoad: 0.7, activeLifeEventCount: 1, confoundedDay: true, moodScore: 78, eveningMood: 78 }),
+    createRow({ day: new Date("2026-05-04T00:00:00.000Z"), positiveLifeEventLoad: 0.6, totalLifeEventLoad: 0.6, activeLifeEventCount: 1, confoundedDay: true, moodScore: 72, eveningMood: 72 }),
+    createRow({ day: new Date("2026-05-05T00:00:00.000Z"), moodScore: 46, eveningMood: 46 }),
+    createRow({ day: new Date("2026-05-06T00:00:00.000Z"), moodScore: 42, eveningMood: 42 }),
+    createRow({ day: new Date("2026-05-07T00:00:00.000Z"), moodScore: 38, eveningMood: 38 }),
+    createRow({ day: new Date("2026-05-08T00:00:00.000Z"), moodScore: 34, eveningMood: 34 }),
+  ];
+
+  const candidate = deriveInsightCandidates(rows).find(
+    (entry) => entry.metric === "LIFE_EVENT_TO_MOOD"
+  );
+
+  assert.ok(candidate);
+  assert.equal(candidate.direction, "POSITIVE");
+  assert.match(candidate.summary, /supportive context appears to lift mood/i);
+  assert.match(candidate.uncertaintySummary, /causal background/i);
+  assert.equal(candidate.payload.confounderAdjusted, true);
+});
+
+test("deriveInsightCandidates attaches story anchors from journal and life-event context", () => {
+  const rows = Array.from({ length: 8 }, (_, index) =>
+    createRow({
+      day: new Date(`2026-05-0${index + 1}T00:00:00.000Z`),
+      exerciseCompleted: index < 4 ? 1 : 0,
+      moodScore: index < 4 ? 76 - index * 2 : 44 - (index - 4) * 2,
+      eveningMood: index < 4 ? 76 - index * 2 : 44 - (index - 4) * 2,
+      journalTitles: index < 2 ? ["Sleep finally moved the floor"] : [],
+      lifeEventTitles: index === 2 ? ["Quieter evenings reset"] : [],
+      confoundedDay: index === 2,
+    })
+  );
+
+  const candidate = deriveInsightCandidates(rows).find(
+    (entry) => entry.metric === "ACTIVITY_TO_MOOD"
+  );
+
+  assert.ok(candidate);
+  assert.ok(Array.isArray(candidate.payload.storyAnchors));
+  assert.equal((candidate.payload.storyAnchors as Array<unknown>).length > 0, true);
+  assert.match(JSON.stringify(candidate.payload.storyAnchors), /Sleep finally moved the floor|Quieter evenings reset/);
+});
+
 test("buildBehaviorFeatureRows prefers explicit life-event day exposures over broad event overlap", () => {
   const day = new Date("2026-05-01T00:00:00.000Z");
   const rows = buildBehaviorFeatureRows({
@@ -327,6 +400,7 @@ test("buildBehaviorFeatureRows prefers explicit life-event day exposures over br
   assert.equal(rows[0]?.confoundedDay, false);
   assert.equal(rows[0]?.negativeLifeEventLoad, 0);
   assert.equal(rows[0]?.positiveLifeEventLoad, 0.08);
+  assert.deepEqual(rows[0]?.lifeEventTitles, ["Deadline pressure"]);
   assert.deepEqual(rows[0]?.lifeEventCategories, ["RECOVERY"]);
   assert.deepEqual(rows[0]?.lifeEventTags, ["walk"]);
 });

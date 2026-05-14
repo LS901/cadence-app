@@ -19,7 +19,7 @@ function ThemedToaster() {
       theme={resolvedTheme === "light" ? "light" : "dark"}
       toastOptions={{
         classNames: {
-          toast: "border-border bg-card text-card-foreground",
+          toast: "w-[calc(100vw-2rem)] max-w-full border-border bg-card text-card-foreground sm:w-auto",
         },
       }}
     />

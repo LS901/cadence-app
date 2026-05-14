@@ -128,6 +128,44 @@ test("extendRecurringSeries generates weekly occurrences through the weekly hori
   assert.equal(createdActivities[11]?.scheduledAt.toISOString(), "2030-03-26T18:00:00.000Z");
 });
 
+test("extendRecurringSeries resumes from the latest existing series activity instead of duplicating earlier dates", async () => {
+  const createdActivities: Array<{ scheduledAt: Date; recurrenceGroupId: string | null }> = [];
+
+  await extendRecurringSeries(
+    {
+      activity: {
+        findFirst: async () => ({
+          scheduledAt: new Date("2030-01-03T08:00:00.000Z"),
+        }),
+        create: async ({ data }: { data: { scheduledAt: Date; recurrenceGroupId: string | null } }) => {
+          createdActivities.push(data);
+          return data;
+        },
+      },
+    } as never,
+    {
+      id: "activity-3",
+      userId: "user-1",
+      templateId: "template-3",
+      title: "Morning walk",
+      category: "EXERCISE",
+      notes: "Short walk before work.",
+      recurring: true,
+      recurrencePattern: "DAILY",
+      recurrenceCustom: null,
+      recurrenceGroupId: "series-3",
+      isRecurringGenerated: false,
+      scheduledAt: new Date("2030-01-01T08:00:00.000Z"),
+      durationMinutes: 30,
+    } as never
+  );
+
+  assert.equal(createdActivities.length, 19);
+  assert.equal(createdActivities[0]?.scheduledAt.toISOString(), "2030-01-04T08:00:00.000Z");
+  assert.equal(createdActivities[18]?.scheduledAt.toISOString(), "2030-01-22T08:00:00.000Z");
+  assert.ok(createdActivities.every((activity) => activity.recurrenceGroupId === "series-3"));
+});
+
 test("ensureRecurringSeriesCoverage assigns a recurrence group id before extending uncovered recurring roots", async () => {
   const updatedActivities: unknown[] = [];
   const createdActivities: Array<{ recurrenceGroupId: string | null }> = [];

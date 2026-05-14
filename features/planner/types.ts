@@ -1,5 +1,5 @@
 import type { LifeEventItem } from "@/features/life-events/types";
-import type { ActivityCategory, ActivityStatus } from "@prisma/client";
+import type { ActivityCategory, ActivityExperimentOutcome, ActivityStatus } from "@prisma/client";
 import type { InsightAnalysisNullState } from "@/server/insights/types";
 
 export type PlannerRecurrencePattern = "DAILY" | "WEEKLY" | "CUSTOM";
@@ -18,6 +18,13 @@ export type PlannerActivityItem = {
   scheduledTimeLabel: string;
   isFuture: boolean;
   durationMinutes?: number | null;
+  experimentHypothesis?: string | null;
+  experimentObservationPrompt?: string | null;
+  experimentReviewWindowDays?: number | null;
+  experimentUncertaintyNote?: string | null;
+  experimentOutcome?: ActivityExperimentOutcome | null;
+  experimentOutcomeNote?: string | null;
+  experimentReviewedAtIso?: string | null;
   completionMoodScore?: number | null;
 };
 
@@ -73,6 +80,10 @@ export type PlannerSuggestedActivityDraft = {
   historyAnchorTitle?: string | null;
   category: ActivityCategory;
   notes: string;
+  hypothesis: string;
+  observationPrompt: string;
+  reviewWindowDays: string;
+  uncertaintyNote: string;
   durationMinutes: string;
   recurring: boolean;
   recurrencePattern: "" | PlannerRecurrencePattern;

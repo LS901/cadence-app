@@ -1,9 +1,53 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getSuggestedDraftFromWeeklyReview,
   getSuggestedDraftHistoryMatch,
   getSuggestedDraftScheduledAt,
 } from "./suggested-draft";
+
+test("getSuggestedDraftFromWeeklyReview maps the weekly review suggestion into a planner draft", () => {
+  const draft = getSuggestedDraftFromWeeklyReview({
+    title: "Weekly review",
+    summary: "A review summary.",
+    momentumLabel: "Momentum",
+    momentumDetail: "Momentum detail.",
+    signalLabel: "Signal",
+    signalDetail: "Signal detail.",
+    contextLabel: "Context",
+    contextDetail: "Context detail.",
+    nextStep: "Next step.",
+    plannerSuggestion: {
+      title: "Protect Morning walk",
+      historyAnchorTitle: "Morning walk",
+      category: "EXERCISE",
+      notes: "Protect it earlier in the week.",
+      hypothesis: "If the walk stays protected, the baseline should steady sooner.",
+      observationPrompt: "Notice whether the morning starts less defended.",
+      reviewWindowDays: 7,
+      uncertaintyNote: "Treat this as a lightweight experiment.",
+      supportStateLabel: "Pending test",
+      supportStateDetail: "Support appears only after follow-through.",
+      durationMinutes: 45,
+      recurring: true,
+      recurrencePattern: "WEEKLY",
+    },
+  });
+
+  assert.deepEqual(draft, {
+    title: "Protect Morning walk",
+    historyAnchorTitle: "Morning walk",
+    category: "EXERCISE",
+    notes: "Protect it earlier in the week.",
+    hypothesis: "If the walk stays protected, the baseline should steady sooner.",
+    observationPrompt: "Notice whether the morning starts less defended.",
+    reviewWindowDays: "7",
+    uncertaintyNote: "Treat this as a lightweight experiment.",
+    durationMinutes: "45",
+    recurring: true,
+    recurrencePattern: "WEEKLY",
+  });
+});
 
 test("getSuggestedDraftHistoryMatch finds a history item by the review anchor title", () => {
   const match = getSuggestedDraftHistoryMatch(

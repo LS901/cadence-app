@@ -1,11 +1,14 @@
+import {
+  clearRateLimitKey,
+  isRateLimitKeyBlocked,
+  recordRateLimitKeyAttempt,
+  type RateLimitDependencies,
+  type RateLimitEntry,
+} from "@/lib/security/rate-limit-store";
+
 const AUTH_WINDOW_MS = 10 * 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 8;
 const AUTH_MAX_KEYS = 500;
-
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
 
 declare global {
   var __cadenceAuthRateLimitStore__: Map<string, RateLimitEntry> | undefined;
@@ -40,74 +43,47 @@ function getClientIpAddress(request?: Request) {
 }
 
 function getRateLimitKey(email: string | null | undefined, request?: Request) {
-  return `${getClientIpAddress(request)}:${normalizeEmail(email) || "unknown"}`;
-}
-
-function pruneExpiredEntries(now: number) {
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (entry.resetAt <= now) {
-      rateLimitStore.delete(key);
-    }
-  }
-
-  if (rateLimitStore.size <= AUTH_MAX_KEYS) {
-    return;
-  }
-
-  const sortedEntries = [...rateLimitStore.entries()].sort(
-    (left, right) => left[1].resetAt - right[1].resetAt
-  );
-
-  while (rateLimitStore.size > AUTH_MAX_KEYS && sortedEntries.length) {
-    const oldestEntry = sortedEntries.shift();
-
-    if (!oldestEntry) {
-      break;
-    }
-
-    rateLimitStore.delete(oldestEntry[0]);
-  }
+  return `credential-sign-in:${getClientIpAddress(request)}:${normalizeEmail(email) || "unknown"}`;
 }
 
 export function isCredentialSignInRateLimited(
   email: string | null | undefined,
-  request?: Request
+  request?: Request,
+  options?: RateLimitDependencies
 ) {
-  const now = Date.now();
-  pruneExpiredEntries(now);
-
-  const entry = rateLimitStore.get(getRateLimitKey(email, request));
-
-  return Boolean(entry && entry.count >= AUTH_MAX_ATTEMPTS && entry.resetAt > now);
+  return isRateLimitKeyBlocked({
+    key: getRateLimitKey(email, request),
+    scope: "credential-sign-in",
+    inMemoryStore: rateLimitStore,
+    maxAttempts: AUTH_MAX_ATTEMPTS,
+    maxKeys: AUTH_MAX_KEYS,
+    dependencies: options,
+  });
 }
 
 export function recordFailedCredentialSignInAttempt(
   email: string | null | undefined,
-  request?: Request
+  request?: Request,
+  options?: RateLimitDependencies
 ) {
-  const now = Date.now();
-  pruneExpiredEntries(now);
-
-  const key = getRateLimitKey(email, request);
-  const existingEntry = rateLimitStore.get(key);
-
-  if (!existingEntry || existingEntry.resetAt <= now) {
-    rateLimitStore.set(key, {
-      count: 1,
-      resetAt: now + AUTH_WINDOW_MS,
-    });
-    return;
-  }
-
-  rateLimitStore.set(key, {
-    count: existingEntry.count + 1,
-    resetAt: existingEntry.resetAt,
+  return recordRateLimitKeyAttempt({
+    key: getRateLimitKey(email, request),
+    scope: "credential-sign-in",
+    inMemoryStore: rateLimitStore,
+    maxKeys: AUTH_MAX_KEYS,
+    windowMs: AUTH_WINDOW_MS,
+    dependencies: options,
   });
 }
 
 export function clearCredentialSignInAttempts(
   email: string | null | undefined,
-  request?: Request
+  request?: Request,
+  options?: RateLimitDependencies
 ) {
-  rateLimitStore.delete(getRateLimitKey(email, request));
+  return clearRateLimitKey({
+    key: getRateLimitKey(email, request),
+    inMemoryStore: rateLimitStore,
+    dependencies: options,
+  });
 }

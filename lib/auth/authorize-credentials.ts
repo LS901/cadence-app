@@ -1,5 +1,3 @@
-import { compare } from "bcryptjs";
-import { db, hasDatabaseUrl } from "@/lib/db";
 import { demoUser } from "@/lib/data/mock-cadence";
 import {
   clearCredentialSignInAttempts,
@@ -15,22 +13,23 @@ export type AuthorizedSignInUser = {
   image?: string | null;
 };
 
-type PersistedAuthUser = {
-  id: string;
-  name: string | null;
-  email: string;
-  image?: string | null;
-  passwordHash?: string | null;
+type AuthorizeCredentialsOptions = {
+  isRateLimited?: (email: string | null | undefined, request?: Request) => boolean | Promise<boolean>;
+  recordFailedAttempt?: (email: string | null | undefined, request?: Request) => void | Promise<void>;
+  clearAttempts?: (email: string | null | undefined, request?: Request) => void | Promise<void>;
 };
 
-type AuthorizeCredentialsOptions = {
-  hasDatabase?: boolean;
-  findUserByEmail?: (email: string) => Promise<PersistedAuthUser | null>;
-  comparePassword?: (password: string, passwordHash: string) => Promise<boolean>;
-  isRateLimited?: (email: string | null | undefined, request?: Request) => boolean;
-  recordFailedAttempt?: (email: string | null | undefined, request?: Request) => void;
-  clearAttempts?: (email: string | null | undefined, request?: Request) => void;
-};
+function getDemoUserIfCredentialsMatch(email: string, password: string) {
+  if (email === demoUser.email && password === demoUser.password) {
+    return {
+      id: demoUser.id,
+      name: demoUser.name,
+      email: demoUser.email,
+    };
+  }
+
+  return null;
+}
 
 export async function authorizeCredentialsSignIn(
   rawCredentials: Record<string, unknown> | undefined,
@@ -44,62 +43,27 @@ export async function authorizeCredentialsSignIn(
     options.recordFailedAttempt ?? recordFailedCredentialSignInAttempt;
   const clearAttempts = options.clearAttempts ?? clearCredentialSignInAttempts;
 
-  if (isRateLimited(attemptedEmail, request)) {
+  if (await isRateLimited(attemptedEmail, request)) {
     return null;
   }
 
   const credentials = signInSchema.safeParse(rawCredentials);
 
   if (!credentials.success) {
-    recordFailedAttempt(attemptedEmail, request);
+    await recordFailedAttempt(attemptedEmail, request);
     return null;
   }
 
-  const hasDatabase = options.hasDatabase ?? hasDatabaseUrl;
-
-  if (!hasDatabase) {
-    if (
-      credentials.data.email === demoUser.email &&
-      credentials.data.password === demoUser.password
-    ) {
-      return {
-        id: demoUser.id,
-        name: demoUser.name,
-        email: demoUser.email,
-      };
-    }
-
-    recordFailedAttempt(credentials.data.email, request);
-    return null;
-  }
-
-  const user = options.findUserByEmail
-    ? await options.findUserByEmail(credentials.data.email)
-    : await db!.user.findUnique({
-        where: { email: credentials.data.email },
-      });
-
-  if (!user?.passwordHash) {
-    recordFailedAttempt(credentials.data.email, request);
-    return null;
-  }
-
-  const passwordMatches = await (options.comparePassword ?? compare)(
-    credentials.data.password,
-    user.passwordHash
+  const demoUserResult = getDemoUserIfCredentialsMatch(
+    credentials.data.email,
+    credentials.data.password
   );
 
-  if (!passwordMatches) {
-    recordFailedAttempt(credentials.data.email, request);
+  if (!demoUserResult) {
+    await recordFailedAttempt(credentials.data.email, request);
     return null;
   }
 
-  clearAttempts(credentials.data.email, request);
-
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    image: user.image,
-  };
+  await clearAttempts(credentials.data.email, request);
+  return demoUserResult;
 }

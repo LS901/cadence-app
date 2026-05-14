@@ -71,6 +71,7 @@ type HabitFormState = {
 
 type HabitsWorkspaceProps = {
   data: HabitsPageData;
+  readOnlyDemo?: boolean;
 };
 
 function formatCategoryLabel(category: HabitCategoryValue) {
@@ -264,6 +265,7 @@ function HabitSection({
   onArchive,
   onLog,
   isPending,
+  readOnlyDemo = false,
 }: {
   title: string;
   description: string;
@@ -272,6 +274,7 @@ function HabitSection({
   onArchive: (habit: HabitItem) => void;
   onLog: (habit: HabitItem, status: HabitLogStatusValue | null) => void;
   isPending: boolean;
+  readOnlyDemo?: boolean;
 }) {
   return (
     <Card className="rounded-[32px] border-border/40 bg-card/70">
@@ -317,7 +320,7 @@ function HabitSection({
                       ) : (
                         <p className="mt-3 text-sm leading-6 text-muted-foreground">
                           {habit.type === "POSITIVE"
-                            ? "Track the habits that create steadier, more supportive days."
+                            ? "Keeping a mental note of things"
                             : "Track the destabilizing patterns you want to interrupt earlier."}
                         </p>
                       )}
@@ -421,7 +424,7 @@ function HabitSection({
                       type="button"
                       className="rounded-full"
                       variant={habit.todayStatus === "COMPLETED" ? "default" : "outline"}
-                      disabled={isPending}
+                      disabled={isPending || readOnlyDemo}
                       onClick={() => onLog(habit, "COMPLETED")}
                     >
                       <Check className="size-4" />
@@ -431,7 +434,7 @@ function HabitSection({
                       type="button"
                       className="rounded-full"
                       variant={habit.todayStatus === "SKIPPED" ? "default" : "outline"}
-                      disabled={isPending}
+                      disabled={isPending || readOnlyDemo}
                       onClick={() => onLog(habit, "SKIPPED")}
                     >
                       <X className="size-4" />
@@ -441,7 +444,7 @@ function HabitSection({
                       type="button"
                       className="rounded-full"
                       variant="ghost"
-                      disabled={isPending}
+                      disabled={isPending || readOnlyDemo}
                       onClick={() => onLog(habit, null)}
                     >
                       Clear
@@ -450,7 +453,7 @@ function HabitSection({
                       type="button"
                       className="rounded-full"
                       variant="ghost"
-                      disabled={isPending}
+                      disabled={isPending || readOnlyDemo}
                       onClick={() => onEdit(habit)}
                     >
                       <Pencil className="size-4" />
@@ -460,7 +463,7 @@ function HabitSection({
                       type="button"
                       className="rounded-full text-muted-foreground"
                       variant="ghost"
-                      disabled={isPending}
+                      disabled={isPending || readOnlyDemo}
                       onClick={() => onArchive(habit)}
                     >
                       <Archive className="size-4" />
@@ -481,7 +484,7 @@ function HabitSection({
   );
 }
 
-export function HabitsWorkspace({ data }: HabitsWorkspaceProps) {
+export function HabitsWorkspace({ data, readOnlyDemo = false }: HabitsWorkspaceProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -579,11 +582,14 @@ export function HabitsWorkspace({ data }: HabitsWorkspaceProps) {
           <Badge variant="outline" className="rounded-full border-border/40 px-3 py-1 text-[11px] uppercase tracking-[0.22em]">
             {optimisticData.dataSource === "mock" ? "Mock preview" : "Database connected"}
           </Badge>
-          <Button type="button" className="rounded-full" onClick={() => openCreateSheet("POSITIVE")}>
+          {readOnlyDemo ? (
+            <p className="text-sm text-muted-foreground">Shared demo is preview-only. Habit edits and logs are disabled.</p>
+          ) : null}
+          <Button type="button" className="rounded-full" onClick={() => openCreateSheet("POSITIVE")} disabled={readOnlyDemo}>
             <Plus className="size-4" />
             Add habit
           </Button>
-          <Button type="button" variant="outline" className="rounded-full" onClick={() => openCreateSheet("NEGATIVE")}>
+          <Button type="button" variant="outline" className="rounded-full" onClick={() => openCreateSheet("NEGATIVE")} disabled={readOnlyDemo}>
             <Plus className="size-4" />
             Add limiting habit
           </Button>
@@ -655,6 +661,7 @@ export function HabitsWorkspace({ data }: HabitsWorkspaceProps) {
         onArchive={handleArchiveHabit}
         onLog={handleLogHabit}
         isPending={isPending}
+        readOnlyDemo={readOnlyDemo}
       />
 
       <HabitSection
@@ -665,6 +672,7 @@ export function HabitsWorkspace({ data }: HabitsWorkspaceProps) {
         onArchive={handleArchiveHabit}
         onLog={handleLogHabit}
         isPending={isPending}
+        readOnlyDemo={readOnlyDemo}
       />
 
       {!allHabits.length ? (
@@ -794,7 +802,7 @@ export function HabitsWorkspace({ data }: HabitsWorkspaceProps) {
                   <Button type="button" variant="outline" className="rounded-full" onClick={() => closeSheet(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="rounded-full" disabled={isPending}>
+                  <Button type="submit" className="rounded-full" disabled={isPending || readOnlyDemo}>
                     {formState.id ? "Save changes" : "Create habit"}
                   </Button>
                 </div>

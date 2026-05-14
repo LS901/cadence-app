@@ -33,7 +33,16 @@ function createSourceData(): DashboardQuerySourceData {
       notes: habit.notes ?? null,
       isArchived: false,
     })),
-    activities: mockActivities,
+    activities: mockActivities.map((activity) => ({
+      ...activity,
+      experimentHypothesis: null,
+      experimentObservationPrompt: null,
+      experimentReviewWindowDays: null,
+      experimentUncertaintyNote: null,
+      experimentOutcome: null,
+      experimentOutcomeNote: null,
+      experimentReviewedAt: null,
+    })),
     journalEntries: mockJournalEntries.map((entry) => ({
       ...entry,
       title: entry.title ?? null,
@@ -146,4 +155,60 @@ test("buildDashboardDataFromSourceData applies the focus window and keeps the da
     result.overview[3]?.detail.includes("May 8 - May 10"),
     true
   );
+});
+
+test("buildDashboardDataFromSourceData surfaces the latest reviewed planner experiment into the weekly review", () => {
+  const sourceData = createSourceData();
+  const referenceNow = new Date("2026-05-10T18:00:00.000Z");
+  sourceData.activities = sourceData.activities.map((activity, index) =>
+    index === 0
+      ? {
+          ...activity,
+          title: "Acceptance experiment walk",
+          status: "COMPLETED",
+          scheduledAt: new Date("2026-05-10T16:30:00.000Z"),
+          completedAt: new Date("2026-05-10T17:15:00.000Z"),
+          experimentHypothesis: "If I walk after work, the evening should settle faster.",
+          experimentObservationPrompt: "Notice whether the evening feels calmer afterward.",
+          experimentReviewWindowDays: 3,
+          experimentUncertaintyNote: "One completion is directional, not proof.",
+          experimentOutcome: "SUPPORTED" as const,
+          experimentOutcomeNote: "The evening settled quickly and felt easier to manage.",
+          experimentReviewedAt: new Date("2026-05-10T17:30:00.000Z"),
+        }
+      : activity
+  );
+
+  const result = buildDashboardDataFromSourceData(demoUser.id, sourceData, null, referenceNow);
+
+  assert.equal(result.weeklyReview.plannerSuggestion.supportStateLabel, "Supported");
+  assert.match(result.weeklyReview.plannerSuggestion.supportStateDetail, /settled quickly/i);
+});
+
+test("buildDashboardDataFromSourceData excludes future activities from the default completion denominator", () => {
+  const sourceData = createSourceData();
+  const referenceNow = new Date("2026-05-10T18:00:00.000Z");
+
+  sourceData.activities = [
+    {
+      ...sourceData.activities[0]!,
+      title: "Completed walk",
+      scheduledAt: new Date("2026-05-09T09:00:00.000Z"),
+      status: "COMPLETED",
+      completedAt: new Date("2026-05-09T09:45:00.000Z"),
+    },
+    {
+      ...sourceData.activities[1]!,
+      title: "Future stretch",
+      scheduledAt: new Date("2026-05-11T09:00:00.000Z"),
+      status: "PLANNED",
+      completedAt: null,
+    },
+  ];
+
+  const result = buildDashboardDataFromSourceData(demoUser.id, sourceData, null, referenceNow);
+
+  assert.equal(result.overview[2]?.label, "Activity completion");
+  assert.equal(result.overview[2]?.value, "100%");
+  assert.equal(result.overview[2]?.detail, "1 of 1 planned activities done");
 });

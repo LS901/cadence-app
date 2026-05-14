@@ -3,7 +3,7 @@
 import { format, startOfDay, subDays } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { BookOpenText, CalendarRange, Pencil, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ import { buildJournalStorytelling } from "@/features/journal/lib/storytelling";
 import { buildJournalThemeArchive } from "@/features/journal/lib/theme-archive";
 import { PageIntro } from "@/features/shared/components/page-intro";
 import type { JournalEntryItem, JournalPageData, JournalPromptTemplate } from "@/features/journal/types";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { lifeEventOverlapsDay } from "@/lib/life-events";
 import { dedupeTags, getMoodColorToken } from "@/lib/mood";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,10 @@ import { deleteJournalEntryAction, upsertJournalEntryAction } from "@/server/jou
 
 type JournalWorkspaceProps = {
   data: JournalPageData;
+  entryMode?: "guided-demo" | null;
+  entrySource?: string | null;
+  scenario?: MockScenarioKey;
+  readOnlyDemo?: boolean;
 };
 
 type JournalFormState = {
@@ -516,10 +521,17 @@ function JournalSignals({ entry, compact = false }: JournalSignalsProps) {
   );
 }
 
-export function JournalWorkspace({ data }: JournalWorkspaceProps) {
+export function JournalWorkspace({
+  data,
+  entryMode = null,
+  entrySource = null,
+  scenario = defaultMockScenario,
+  readOnlyDemo = false,
+}: JournalWorkspaceProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const editorReturnFocusRef = useRef<HTMLElement | null>(null);
   const [activeStoryWindowId, setActiveStoryWindowId] = useState<string | null>(null);
   const [activeThemeTag, setActiveThemeTag] = useState<string | null>(null);
   const [formState, setFormState] = useState<JournalFormState>(() => createJournalFormState());
@@ -527,9 +539,15 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
   const surfaceData = optimisticData ?? data;
   const latestEntry = surfaceData.latestEntry;
   const storyline = surfaceData.storyline;
+  const guidedPrompt = entryMode === "guided-demo" && entrySource === "planner"
+    ? surfaceData.promptLibrary[0] ?? null
+    : null;
+  const defaultGuidedStoryWindow = entryMode === "guided-demo" && entrySource === "planner"
+    ? surfaceData.storyWindows[0] ?? null
+    : null;
   const activeStoryWindow = useMemo(
-    () => surfaceData.storyWindows.find((window) => window.id === activeStoryWindowId) ?? null,
-    [activeStoryWindowId, surfaceData.storyWindows]
+    () => surfaceData.storyWindows.find((window) => window.id === activeStoryWindowId) ?? defaultGuidedStoryWindow,
+    [activeStoryWindowId, defaultGuidedStoryWindow, surfaceData.storyWindows]
   );
   const activeTheme = useMemo(
     () => surfaceData.themeArchive.find((theme) => theme.tag === activeThemeTag) ?? null,
@@ -556,21 +574,33 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
     [activeStoryWindow, surfaceData.insightOverlays]
   );
   const selectedOverlayWindow = activeStoryWindow ?? surfaceData.storyWindows[0] ?? null;
-  const overlayDashboardHref = selectedOverlayWindow
-    ? `/dashboard?${new URLSearchParams({
+  const overlayDashboardParams = selectedOverlayWindow
+    ? new URLSearchParams({
         focus: "weekly-review",
         source: "journal",
         windowStart: selectedOverlayWindow.windowStartIso,
         windowEnd: selectedOverlayWindow.windowEndIso,
-      }).toString()}`
+      })
     : null;
-  const overlayMoodHref = selectedOverlayWindow
-    ? `/mood?${new URLSearchParams({
+
+  if (overlayDashboardParams && scenario !== defaultMockScenario) {
+    overlayDashboardParams.set("scenario", scenario);
+  }
+
+  const overlayDashboardHref = overlayDashboardParams ? `/dashboard?${overlayDashboardParams.toString()}` : null;
+  const overlayMoodParams = selectedOverlayWindow
+    ? new URLSearchParams({
         source: "journal",
         windowStart: selectedOverlayWindow.windowStartIso,
         windowEnd: selectedOverlayWindow.windowEndIso,
-      }).toString()}`
+      })
     : null;
+
+  if (overlayMoodParams && scenario !== defaultMockScenario) {
+    overlayMoodParams.set("scenario", scenario);
+  }
+
+  const overlayMoodHref = overlayMoodParams ? `/mood?${overlayMoodParams.toString()}` : null;
 
   const latestMoodLabel = useMemo(() => {
     if (surfaceData.summary.averageMoodScore == null) {
@@ -589,13 +619,31 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
     [formState.day, surfaceData.availableLifeEvents]
   );
 
+  function captureEditorReturnFocusTarget() {
+    if (typeof document === "undefined") {
+      editorReturnFocusRef.current = null;
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    editorReturnFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+  }
+
   function openCreateEditor(prompt?: JournalPromptTemplate) {
+    if (readOnlyDemo) {
+      return;
+    }
+    captureEditorReturnFocusTarget();
     const baseState = createJournalFormState();
     setFormState(prompt ? withPromptTemplate(baseState, prompt) : baseState);
     setIsEditorOpen(true);
   }
 
   function openEditEditor(entry: JournalEntryItem) {
+    if (readOnlyDemo) {
+      return;
+    }
+    captureEditorReturnFocusTarget();
     setFormState(createJournalFormState(entry));
     setIsEditorOpen(true);
   }
@@ -604,7 +652,16 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
     setIsEditorOpen(open);
 
     if (!open) {
+      const returnFocusTarget = editorReturnFocusRef.current;
+
+      editorReturnFocusRef.current = null;
       setFormState(createJournalFormState());
+
+      if (returnFocusTarget) {
+        window.requestAnimationFrame(() => {
+          returnFocusTarget.focus();
+        });
+      }
     }
   }
 
@@ -670,15 +727,97 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
           description="Use the journal to record narrative context, tag entries with mood when it helps, and keep enough detail that patterns can surface without flattening the day into a single score."
         />
         <div className="flex flex-wrap gap-3">
-          <Badge variant="outline" className="rounded-full border-border/40 px-3 py-1 text-[11px] uppercase tracking-[0.22em]">
+          <Badge variant="outline" className="rounded-full border-border/40 px-2 sm:px-3 py-1 text-[9px] sm:text-[11px] uppercase tracking-[0.22em]">
             {surfaceData.dataSource === "mock" ? "Mock preview" : "Database connected"}
           </Badge>
-          <Button type="button" className="rounded-full" onClick={() => openCreateEditor()}>
+          {readOnlyDemo ? (
+            <p className="text-sm text-muted-foreground">Shared demo is preview-only. Journal writing is disabled.</p>
+          ) : null}
+          <Button type="button" className="rounded-full" onClick={() => openCreateEditor()} disabled={readOnlyDemo}>
             <Plus className="size-4" />
             New entry
           </Button>
         </div>
       </div>
+
+      {entryMode === "guided-demo" ? (
+        <Card className="glass-card rounded-[32px] border-primary/20 bg-primary/[0.04]">
+          <CardContent className="grid gap-5 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Guided demo path · Step 3 of 4</p>
+              <p className="mt-3 text-xl font-semibold tracking-tight text-foreground">Capture the narrative context behind the experiment.</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {entrySource === "planner"
+                  ? "You arrived from Planner after the weekly review handoff. Use Journal to record why the experiment felt supportive, noisy, or harder than the metrics alone suggest before comparing that story in Insights."
+                  : "Use Journal to add narrative texture after the weekly review and planner steps have set the analytical frame."}
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {guidedPrompt ? (
+                <div className="rounded-[24px] border border-border/40 bg-background/65 p-4 text-sm leading-6 text-muted-foreground">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Recommended next prompt</p>
+                  <p className="mt-2 text-base font-medium text-foreground">{guidedPrompt.label}</p>
+                  <p className="mt-2">{guidedPrompt.description}</p>
+                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">{guidedPrompt.whyNow}</p>
+                </div>
+              ) : null}
+              {[
+                "1. Keep the planner experiment in mind while writing.",
+                "2. Capture the emotional texture or context the dashboard cannot fully express.",
+                "3. Use the weekly comparison card below to connect narrative and review language.",
+              ].map((item) => (
+                <div key={item} className="rounded-[24px] border border-border/40 bg-background/65 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                  {item}
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-3 pt-1">
+                {guidedPrompt ? (
+                  <Button type="button" className="rounded-full" onClick={() => openCreateEditor(guidedPrompt)} disabled={readOnlyDemo}>
+                    Open guided reflection
+                  </Button>
+                ) : null}
+                <Link
+                  href={`/insights?${new URLSearchParams({
+                    entry: "guided-demo",
+                    source: "journal",
+                    ...(scenario !== defaultMockScenario ? { scenario } : {}),
+                  }).toString()}`}
+                  className={buttonVariants({
+                    variant: "outline",
+                    className: "rounded-full border-border/40 bg-transparent",
+                  })}
+                >
+                  Continue into Insights
+                </Link>
+                <Link
+                  href={`/dashboard?${new URLSearchParams({
+                    entry: "guided-demo",
+                    ...(scenario !== defaultMockScenario ? { scenario } : {}),
+                  }).toString()}`}
+                  className={buttonVariants({
+                    variant: "outline",
+                    className: "rounded-full border-border/40 bg-transparent",
+                  })}
+                >
+                  Open dashboard weekly review
+                </Link>
+                <Link
+                  href={`/planner?${new URLSearchParams({
+                    entry: "guided-demo",
+                    ...(scenario !== defaultMockScenario ? { scenario } : {}),
+                  }).toString()}`}
+                  className={buttonVariants({
+                    variant: "outline",
+                    className: "rounded-full border-border/40 bg-transparent",
+                  })}
+                >
+                  Return to Planner
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-[28px] border-border/40 bg-card/70">
@@ -730,9 +869,16 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
             <button
               key={prompt.id}
               type="button"
-              className="rounded-[24px] border border-border/40 bg-background/35 p-5 text-left transition hover:border-border/70 hover:bg-background/50"
+              className={cn(
+                "rounded-[24px] border border-border/40 bg-background/35 p-5 text-left transition hover:border-border/70 hover:bg-background/50",
+                guidedPrompt?.id === prompt.id && "border-primary/35 bg-primary/[0.06]"
+              )}
+              disabled={readOnlyDemo}
               onClick={() => openCreateEditor(prompt)}
             >
+              {guidedPrompt?.id === prompt.id ? (
+                <p className="text-[11px] uppercase tracking-[0.22em] text-primary">Recommended from Planner</p>
+              ) : null}
               <p className="text-base font-semibold tracking-tight text-foreground">{prompt.label}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{prompt.description}</p>
               <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">{prompt.whyNow}</p>
@@ -797,7 +943,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                 {latestEntry ? <JournalSignals entry={latestEntry} compact /> : null}
                 {latestEntry ? (
                   <div className="flex flex-wrap gap-3">
-                    <Button type="button" className="rounded-full" onClick={() => openEditEditor(latestEntry)}>
+                    <Button type="button" className="rounded-full" onClick={() => openEditEditor(latestEntry)} disabled={readOnlyDemo}>
                       <Pencil className="size-4" />
                       Edit latest entry
                     </Button>
@@ -805,7 +951,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                       type="button"
                       variant="ghost"
                       className="rounded-full text-muted-foreground"
-                      disabled={isPending}
+                      disabled={isPending || readOnlyDemo}
                       onClick={() => handleDeleteEntry(latestEntry)}
                     >
                       <Trash2 className="size-4" />
@@ -838,7 +984,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                 </div>
                 <JournalSignals entry={latestEntry} />
                 <div className="flex flex-wrap gap-3">
-                  <Button type="button" className="rounded-full" onClick={() => openEditEditor(latestEntry)}>
+                  <Button type="button" className="rounded-full" onClick={() => openEditEditor(latestEntry)} disabled={readOnlyDemo}>
                     <Pencil className="size-4" />
                     Edit entry
                   </Button>
@@ -846,7 +992,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                     type="button"
                     variant="ghost"
                     className="rounded-full text-muted-foreground"
-                    disabled={isPending}
+                    disabled={isPending || readOnlyDemo}
                     onClick={() => handleDeleteEntry(latestEntry)}
                   >
                     <Trash2 className="size-4" />
@@ -1204,7 +1350,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                       {entry.wordCount} words
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="ghost" className="rounded-full" onClick={() => openEditEditor(entry)}>
+                      <Button type="button" variant="ghost" className="rounded-full" onClick={() => openEditEditor(entry)} disabled={readOnlyDemo}>
                         <Pencil className="size-4" />
                         Edit
                       </Button>
@@ -1212,7 +1358,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                         type="button"
                         variant="ghost"
                         className="rounded-full text-muted-foreground"
-                        disabled={isPending}
+                        disabled={isPending || readOnlyDemo}
                         onClick={() => handleDeleteEntry(entry)}
                       >
                         <Trash2 className="size-4" />
@@ -1269,7 +1415,8 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                     <button
                       key={prompt.id}
                       type="button"
-                      className="rounded-[18px] border border-border/40 bg-background/40 px-4 py-3 text-left transition hover:border-border/70 hover:bg-background/55"
+                      className="rounded-[18px] border border-border/40 bg-background/40 px-4 py-3 text-left transition hover:border-border/70 hover:bg-background/55 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={readOnlyDemo}
                       onClick={() => applyPromptTemplate(prompt)}
                     >
                       <p className="text-sm font-medium text-foreground">{prompt.label}</p>
@@ -1351,6 +1498,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                 <Label htmlFor="journalTitle">Title</Label>
                 <Input
                   id="journalTitle"
+                  autoFocus
                   value={formState.title}
                   onChange={(event) =>
                     setFormState((current) => ({ ...current, title: event.target.value }))
@@ -1382,7 +1530,7 @@ export function JournalWorkspace({ data }: JournalWorkspaceProps) {
                   <Button type="button" variant="outline" className="rounded-full" onClick={() => closeEditor(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="rounded-full" disabled={isPending}>
+                  <Button type="submit" className="rounded-full" disabled={isPending || readOnlyDemo}>
                     <Save className="size-4" />
                     {formState.id ? "Save changes" : "Save entry"}
                   </Button>

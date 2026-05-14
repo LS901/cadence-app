@@ -23,7 +23,7 @@ export default function AppError({ error, reset }: AppErrorProps) {
             <CadenceMark className="size-8" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+            <p className="font-geist text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
               Cadence recovery
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">

@@ -12,7 +12,8 @@ import type {
   PlannerActivityItem,
   PlannerData,
 } from "@/features/planner/types";
-import { mockActivities, mockLifeEventItems } from "@/lib/data/mock-cadence";
+import { getMockScenarioData } from "@/lib/data/mock-cadence";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { lifeEventOverlapsDay } from "@/lib/life-events";
 
 function buildPlannerData(
@@ -94,6 +95,13 @@ function mapActivity(
     recurrenceCustom?: string | null;
     scheduledAt: Date;
     durationMinutes: number | null;
+    experimentHypothesis: string | null;
+    experimentObservationPrompt: string | null;
+    experimentReviewWindowDays: number | null;
+    experimentUncertaintyNote: string | null;
+    experimentOutcome: PlannerActivityItem["experimentOutcome"];
+    experimentOutcomeNote: string | null;
+    experimentReviewedAt: Date | null;
     completionMoodScore: number | null;
   },
   now = new Date()
@@ -112,6 +120,13 @@ function mapActivity(
     scheduledTimeLabel: format(activity.scheduledAt, "h:mm a"),
     isFuture: activity.scheduledAt > now,
     durationMinutes: activity.durationMinutes,
+    experimentHypothesis: activity.experimentHypothesis,
+    experimentObservationPrompt: activity.experimentObservationPrompt,
+    experimentReviewWindowDays: activity.experimentReviewWindowDays,
+    experimentUncertaintyNote: activity.experimentUncertaintyNote,
+    experimentOutcome: activity.experimentOutcome,
+    experimentOutcomeNote: activity.experimentOutcomeNote,
+    experimentReviewedAtIso: activity.experimentReviewedAt?.toISOString() ?? null,
     completionMoodScore: activity.completionMoodScore,
   };
 }
@@ -188,13 +203,18 @@ function buildMockActivityHistory(
     });
 }
 
-export function buildMockPlannerData(userId: string, now = new Date()): PlannerData {
+export function buildMockPlannerData(
+  userId: string,
+  now = new Date(),
+  scenario: MockScenarioKey = defaultMockScenario
+): PlannerData {
+  const scenarioData = getMockScenarioData(scenario);
   const today = now;
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
 
   const mockHistory = buildMockActivityHistory(
-    mockActivities
+    scenarioData.activities
       .filter((activity) => activity.userId === userId)
       .map((activity) => ({
         title: activity.title,
@@ -202,13 +222,20 @@ export function buildMockPlannerData(userId: string, now = new Date()): PlannerD
         notes: activity.notes,
         durationMinutes: null,
         completionMoodScore: activity.completionMoodScore ?? null,
+        experimentHypothesis: null,
+        experimentObservationPrompt: null,
+        experimentReviewWindowDays: null,
+        experimentUncertaintyNote: null,
+        experimentOutcome: null,
+        experimentOutcomeNote: null,
+        experimentReviewedAt: null,
         completedAt: activity.status === "COMPLETED" ? activity.scheduledAt : null,
         sortAt: activity.scheduledAt,
       }))
   );
 
   return buildPlannerData(
-    mockActivities
+    scenarioData.activities
       .filter(
         (activity) =>
           activity.userId === userId &&
@@ -230,10 +257,17 @@ export function buildMockPlannerData(userId: string, now = new Date()): PlannerD
         scheduledTimeLabel: format(activity.scheduledAt, "h:mm a"),
         isFuture: activity.scheduledAt > today,
         durationMinutes: null,
+        experimentHypothesis: null,
+        experimentObservationPrompt: null,
+        experimentReviewWindowDays: null,
+        experimentUncertaintyNote: null,
+        experimentOutcome: null,
+        experimentOutcomeNote: null,
+        experimentReviewedAtIso: null,
         completionMoodScore: activity.completionMoodScore ?? null,
       })),
     mockHistory,
-    mockLifeEventItems,
+    scenarioData.lifeEventItems,
     "mock",
     now
   );
@@ -252,6 +286,13 @@ export type PlannerQuerySourceData = {
     recurrenceCustom: string | null;
     scheduledAt: Date;
     durationMinutes: number | null;
+    experimentHypothesis: string | null;
+    experimentObservationPrompt: string | null;
+    experimentReviewWindowDays: number | null;
+    experimentUncertaintyNote: string | null;
+    experimentOutcome: PlannerActivityItem["experimentOutcome"];
+    experimentOutcomeNote: string | null;
+    experimentReviewedAt: Date | null;
     completionMoodScore: number | null;
   }>;
   templates: Array<{
@@ -276,6 +317,15 @@ type PlannerQueryDependencies = {
   loadPlannerSourceData: (userId: string, weekStart: Date, weekEnd: Date) => Promise<PlannerQuerySourceData>;
   now?: () => Date;
 };
+
+function isRecoverablePrismaError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    error instanceof Prisma.PrismaClientValidationError ||
+    error instanceof Prisma.PrismaClientKnownRequestError ||
+    error instanceof Prisma.PrismaClientUnknownRequestError
+  );
+}
 
 export function buildPlannerDataFromSourceData(
   sourceData: PlannerQuerySourceData,
@@ -330,7 +380,7 @@ export async function getPlannerDataWithDependencies(
 
     return buildPlannerDataFromSourceData(sourceData, today);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientInitializationError) {
+    if (isRecoverablePrismaError(error)) {
       return dependencies.buildMockPlannerData(userId, today);
     }
 

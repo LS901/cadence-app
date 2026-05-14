@@ -50,7 +50,7 @@ test("updateSettingsProfile trims the name, updates the user, and revalidates", 
 
   const result = await updateSettingsProfile(
     {
-      name: "  Lewis Carter  ",
+      name: "  Demo Carter  ",
       timezone: "Europe/London",
     },
     dependencies
@@ -67,7 +67,7 @@ test("updateSettingsProfile trims the name, updates the user, and revalidates", 
   assert.deepEqual(updatePayload, {
     where: { id: "user-1" },
     data: {
-      name: "Lewis Carter",
+      name: "Demo Carter",
       timezone: "Europe/London",
     },
   });
@@ -98,7 +98,7 @@ test("updateSettingsProfile rejects unauthorized access before touching persiste
     () =>
       updateSettingsProfile(
         {
-          name: "Lewis Carter",
+          name: "Demo Carter",
           timezone: "Europe/London",
         },
         dependencies

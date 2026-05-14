@@ -16,11 +16,9 @@ import { buildJournalStorytelling } from "@/features/journal/lib/storytelling";
 import { buildJournalThemeArchive } from "@/features/journal/lib/theme-archive";
 import {
   demoUser,
-  mockActivities,
-  mockJournalEntries,
-  mockLifeEventItems,
-  mockMoodEntries,
+  getMockScenarioData,
 } from "@/lib/data/mock-cadence";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { db, hasDatabaseUrl } from "@/lib/db";
 import { lifeEventOverlapsDay } from "@/lib/life-events";
 import { dedupeTags, formatMinuteLabel } from "@/lib/mood";
@@ -338,6 +336,7 @@ function buildWeeklyReviewSnapshot(
     completedActivities: recentActivities.filter((activity) => activity.status === "COMPLETED").length,
     totalActivities: recentActivities.length,
     journalCount: journalEntries.filter((entry) => entry.day >= reviewWindowStart).length,
+    recentExperiment: null,
   });
 
   return {
@@ -393,6 +392,7 @@ function buildMoodArchiveSnapshots(
       completedActivities: archiveActivities.filter((activity) => activity.status === "COMPLETED").length,
       totalActivities: archiveActivities.length,
       journalCount: archiveJournalEntries.length,
+      recentExperiment: null,
     });
 
     return {
@@ -459,8 +459,9 @@ export function buildJournalPageDataFromSourceData(
   };
 }
 
-export function buildMockJournalPageData() {
-  const moodEntries = mockMoodEntries.map((entry) => ({
+export function buildMockJournalPageData(scenario: MockScenarioKey = defaultMockScenario) {
+  const scenarioData = getMockScenarioData(scenario);
+  const moodEntries = scenarioData.moodEntries.map((entry) => ({
     day: entry.day,
     score: entry.score,
     moodStability: entry.moodStability,
@@ -474,7 +475,7 @@ export function buildMockJournalPageData() {
       tags: period.tags,
     })),
   }));
-  const activities = mockActivities.map((activity) => ({
+  const activities = scenarioData.activities.map((activity) => ({
     id: activity.id,
     title: activity.title,
     category: activity.category,
@@ -485,7 +486,7 @@ export function buildMockJournalPageData() {
 
   return buildJournalPageDataFromSourceData(
     "mock",
-    mockJournalEntries.map((entry) => ({
+    scenarioData.journalEntries.map((entry) => ({
       id: entry.id,
       day: entry.day,
       title: entry.title ?? null,
@@ -494,7 +495,7 @@ export function buildMockJournalPageData() {
     })),
     moodEntries,
     activities,
-    mockLifeEventItems
+    scenarioData.lifeEventItems
   );
 }
 
@@ -587,10 +588,13 @@ export async function getJournalPageDataWithDependencies(
   }
 }
 
-export async function getJournalPageData(userId = demoUser.id): Promise<JournalPageData> {
+export async function getJournalPageData(
+  userId = demoUser.id,
+  scenario: MockScenarioKey = defaultMockScenario
+): Promise<JournalPageData> {
   return getJournalPageDataWithDependencies(userId, {
     hasDatabase: hasDatabaseUrl && Boolean(db?.journalEntry),
-    buildMockJournalPageData,
+    buildMockJournalPageData: () => buildMockJournalPageData(scenario),
     findJournalEntries: async (currentUserId) => {
       const entries = await db!.journalEntry.findMany({
         where: { userId: currentUserId },

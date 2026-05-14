@@ -2,29 +2,73 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { assertWritableDemoSession } from "@/lib/auth/read-only-demo";
 import { db, hasDatabaseUrl } from "@/lib/db";
 import { deleteJournalEntry, upsertJournalEntry } from "./mutations";
 
-function revalidateJournalSurfaces() {
-  revalidatePath("/journal");
-  revalidatePath("/dashboard");
-  revalidatePath("/insights");
+type JournalMutationDependencies = Parameters<typeof upsertJournalEntry>[1];
+
+type JournalActionDependencies = {
+  getSession: JournalMutationDependencies["getSession"];
+  hasDatabase: JournalMutationDependencies["hasDatabase"];
+  journalEntry: JournalMutationDependencies["journalEntry"];
+  revalidatePath: typeof revalidatePath;
+  upsertJournalEntryImpl: (
+    values: unknown,
+    dependencies: JournalMutationDependencies
+  ) => Promise<unknown>;
+  deleteJournalEntryImpl: (
+    values: unknown,
+    dependencies: JournalMutationDependencies
+  ) => Promise<unknown>;
+};
+
+function createJournalRevalidateSurfaces(revalidatePathImpl: typeof revalidatePath) {
+  return function revalidateJournalSurfaces() {
+    revalidatePathImpl("/journal");
+    revalidatePathImpl("/dashboard");
+    revalidatePathImpl("/insights");
+  };
 }
 
-export async function upsertJournalEntryAction(values: unknown) {
-  return upsertJournalEntry(values, {
-    getSession: auth,
-    hasDatabase: hasDatabaseUrl,
-    journalEntry: db?.journalEntry,
-    revalidateSurfaces: revalidateJournalSurfaces,
-  });
+function buildJournalActionHandlers(dependencies: JournalActionDependencies) {
+  const revalidateSurfaces = createJournalRevalidateSurfaces(dependencies.revalidatePath);
+
+  return {
+    async upsertJournalEntryAction(values: unknown) {
+      await assertWritableDemoSession(dependencies.getSession);
+      return dependencies.upsertJournalEntryImpl(values, {
+        getSession: dependencies.getSession,
+        hasDatabase: dependencies.hasDatabase,
+        journalEntry: dependencies.journalEntry,
+        revalidateSurfaces,
+      });
+    },
+
+    async deleteJournalEntryAction(values: unknown) {
+      await assertWritableDemoSession(dependencies.getSession);
+      return dependencies.deleteJournalEntryImpl(values, {
+        getSession: dependencies.getSession,
+        hasDatabase: dependencies.hasDatabase,
+        journalEntry: dependencies.journalEntry,
+        revalidateSurfaces,
+      });
+    },
+  };
 }
 
-export async function deleteJournalEntryAction(values: unknown) {
-  return deleteJournalEntry(values, {
-    getSession: auth,
-    hasDatabase: hasDatabaseUrl,
-    journalEntry: db?.journalEntry,
-    revalidateSurfaces: revalidateJournalSurfaces,
-  });
+export async function createJournalActionHandlers(dependencies: JournalActionDependencies) {
+  return buildJournalActionHandlers(dependencies);
 }
+
+const journalActionHandlers = buildJournalActionHandlers({
+  getSession: auth,
+  hasDatabase: hasDatabaseUrl,
+  journalEntry: db?.journalEntry,
+  revalidatePath,
+  upsertJournalEntryImpl: upsertJournalEntry,
+  deleteJournalEntryImpl: deleteJournalEntry,
+});
+
+export const upsertJournalEntryAction = journalActionHandlers.upsertJournalEntryAction;
+export const deleteJournalEntryAction = journalActionHandlers.deleteJournalEntryAction;

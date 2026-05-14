@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildMockInsightLifeEventDayExposures,
+  buildMockInsightsContextData,
   buildInsightAnalysisSnapshotFromSourceData,
   getInsightAnalysisSnapshotWithDependencies,
   getInsightsPageDataWithDependencies,
@@ -8,6 +10,7 @@ import {
 } from "./queries";
 import {
   demoUser,
+  getMockScenarioData,
   mockActivities,
   mockHabitLogs,
   mockHabits,
@@ -134,4 +137,18 @@ test("getInsightsPageDataWithDependencies returns page data using the analysis s
   assert.equal(result.context, context);
   assert.equal(result.analysis.readiness, analysis.readiness);
   assert.deepEqual(result.analysis.summary, analysis.summary);
+});
+
+test("alternate mock insight builders stay aligned with the alternate scenario context", () => {
+  const alternateScenario = getMockScenarioData("alternate");
+  const context = buildMockInsightsContextData("alternate");
+  const exposures = buildMockInsightLifeEventDayExposures("alternate");
+
+  assert.equal(context.lifeEvents[0]?.title, alternateScenario.lifeEventItems[0]?.title);
+  assert.equal(context.summary.totalEvents, alternateScenario.lifeEvents.length);
+  assert.ok(exposures.length > 0);
+  assert.equal(
+    exposures.every((exposure) => alternateScenario.lifeEvents.some((event) => event.id === exposure.lifeEventId)),
+    true
+  );
 });

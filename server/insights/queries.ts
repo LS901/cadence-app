@@ -1,32 +1,94 @@
 import { Prisma } from "@prisma/client";
+import type { LifeEventsContextData } from "@/features/life-events/types";
 import {
   demoUser,
-  mockActivities,
-  mockHabitLogs,
-  mockHabits,
-  mockJournalEntries,
-  mockLifeEvents,
-  mockMoodEntries,
+  getMockScenarioData,
 } from "@/lib/data/mock-cadence";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { db, hasDatabaseUrl } from "@/lib/db";
 import {
-  getAnalyticsLifeEventDayExposures,
   getAnalyticsLifeEvents,
-  getLifeEventsContextData,
+  getAnalyticsLifeEventDayExposures,
 } from "@/server/life-events/queries";
+import { buildLifeEventDayExposureRows } from "@/server/life-events/day-exposures";
+import {
+  buildMockLifeEventRecordsFromEvents,
+  buildLifeEventsContextData,
+  getLifeEventsContextDataWithDependencies,
+  type LifeEventDayExposureRecord,
+  type LifeEventRecord,
+} from "@/server/life-events/query-service";
 import { buildInsightAnalysisSnapshot } from "@/server/insights/analysis";
 import type { InsightsPageData } from "@/features/insights/types";
 import type { InsightAnalysisSnapshot } from "@/server/insights/types";
 
-async function buildMockInsightAnalysisSnapshot(userId = demoUser.id) {
+export function buildMockInsightLifeEventDayExposures(
+  scenario: MockScenarioKey = defaultMockScenario
+) {
+  return buildLifeEventDayExposureRows(
+    buildMockLifeEventRecordsFromEvents(getMockScenarioData(scenario).lifeEvents)
+  ).map((row) => ({
+    id: `${row.lifeEventId}-${row.day.toISOString().slice(0, 10)}`,
+    ...row,
+  }));
+}
+
+export function buildMockInsightsContextData(
+  scenario: MockScenarioKey = defaultMockScenario
+): LifeEventsContextData {
+  return buildLifeEventsContextData(
+    "mock",
+    buildMockLifeEventRecordsFromEvents(getMockScenarioData(scenario).lifeEvents)
+  );
+}
+
+async function loadLifeEventsContextDataForScenario(
+  userId: string,
+  scenario: MockScenarioKey = defaultMockScenario
+) {
+  return getLifeEventsContextDataWithDependencies(userId, {
+    hasLifeEventDatabase: hasDatabaseUrl && Boolean(db?.lifeEvent),
+    hasExposureDatabase: hasDatabaseUrl && Boolean(db?.lifeEventDayExposure),
+    buildMockLifeEventRecords: () => buildMockLifeEventRecordsFromEvents(getMockScenarioData(scenario).lifeEvents),
+    findLifeEventRecords: async (currentUserId) => {
+      return (await db!.lifeEvent.findMany({
+        where: { userId: currentUserId },
+        include: {
+          recurrenceSeries: {
+            select: {
+              title: true,
+              recurrencePattern: true,
+              recurrenceInterval: true,
+              recurrenceRule: true,
+            },
+          },
+        },
+        orderBy: [{ startAt: "desc" }, { updatedAt: "desc" }],
+        take: 40,
+      })) as LifeEventRecord[];
+    },
+    findLifeEventDayExposureRecords: async (currentUserId) => {
+      return (await db!.lifeEventDayExposure.findMany({
+        where: { userId: currentUserId },
+        orderBy: [{ day: "asc" }],
+        take: 180,
+      })) as LifeEventDayExposureRecord[];
+    },
+  });
+}
+
+async function buildMockInsightAnalysisSnapshot(
+  scenario: MockScenarioKey = defaultMockScenario
+) {
+  const scenarioData = getMockScenarioData(scenario);
   return buildInsightAnalysisSnapshot({
-    activities: mockActivities,
-    habits: mockHabits,
-    habitLogs: mockHabitLogs,
-    journalEntries: mockJournalEntries,
-    moodEntries: mockMoodEntries,
-    lifeEvents: mockLifeEvents,
-    lifeEventDayExposures: await getAnalyticsLifeEventDayExposures(userId),
+    activities: scenarioData.activities,
+    habits: scenarioData.habits,
+    habitLogs: scenarioData.habitLogs,
+    journalEntries: scenarioData.journalEntries,
+    moodEntries: scenarioData.moodEntries,
+    lifeEvents: scenarioData.lifeEvents,
+    lifeEventDayExposures: buildMockInsightLifeEventDayExposures(scenario),
   });
 }
 
@@ -116,9 +178,9 @@ export async function getInsightAnalysisSnapshotWithDependencies(
   userId = demoUser.id,
   dependencies: InsightQueryDependencies = {
     hasDatabase: hasDatabaseUrl,
-    buildMockInsightAnalysisSnapshot,
+    buildMockInsightAnalysisSnapshot: async () => buildMockInsightAnalysisSnapshot(),
     loadInsightAnalysisSourceData,
-    loadLifeEventsContextData: getLifeEventsContextData,
+    loadLifeEventsContextData: (currentUserId) => loadLifeEventsContextDataForScenario(currentUserId),
   }
 ) {
   if (!dependencies.hasDatabase) {
@@ -138,17 +200,25 @@ export async function getInsightAnalysisSnapshotWithDependencies(
   }
 }
 
-export async function getInsightAnalysisSnapshot(userId = demoUser.id) {
-  return getInsightAnalysisSnapshotWithDependencies(userId);
+export async function getInsightAnalysisSnapshot(
+  userId = demoUser.id,
+  scenario: MockScenarioKey = defaultMockScenario
+) {
+  return getInsightAnalysisSnapshotWithDependencies(userId, {
+    hasDatabase: hasDatabaseUrl,
+    buildMockInsightAnalysisSnapshot: async () => buildMockInsightAnalysisSnapshot(scenario),
+    loadInsightAnalysisSourceData,
+    loadLifeEventsContextData: (currentUserId) => loadLifeEventsContextDataForScenario(currentUserId, scenario),
+  });
 }
 
 export async function getInsightsPageDataWithDependencies(
   userId = demoUser.id,
   dependencies: InsightQueryDependencies = {
     hasDatabase: hasDatabaseUrl,
-    buildMockInsightAnalysisSnapshot,
+    buildMockInsightAnalysisSnapshot: async () => buildMockInsightAnalysisSnapshot(),
     loadInsightAnalysisSourceData,
-    loadLifeEventsContextData: getLifeEventsContextData,
+    loadLifeEventsContextData: (currentUserId) => loadLifeEventsContextDataForScenario(currentUserId),
   }
 ): Promise<InsightsPageData> {
   const [analysis, context] = await Promise.all([
@@ -163,6 +233,14 @@ export async function getInsightsPageDataWithDependencies(
   };
 }
 
-export async function getInsightsPageData(userId = demoUser.id): Promise<InsightsPageData> {
-  return getInsightsPageDataWithDependencies(userId);
+export async function getInsightsPageData(
+  userId = demoUser.id,
+  scenario: MockScenarioKey = defaultMockScenario
+): Promise<InsightsPageData> {
+  return getInsightsPageDataWithDependencies(userId, {
+    hasDatabase: hasDatabaseUrl,
+    buildMockInsightAnalysisSnapshot: async () => buildMockInsightAnalysisSnapshot(scenario),
+    loadInsightAnalysisSourceData,
+    loadLifeEventsContextData: (currentUserId) => loadLifeEventsContextDataForScenario(currentUserId, scenario),
+  });
 }

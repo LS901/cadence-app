@@ -1,11 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { db, hasDatabaseUrl } from "@/lib/db";
 import { authorizeCredentialsSignIn } from "@/lib/auth/authorize-credentials";
+import { demoUser } from "@/lib/data/mock-cadence";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
-  adapter: hasDatabaseUrl && db ? PrismaAdapter(db) : undefined,
   session: {
     strategy: "jwt",
   },
@@ -35,6 +33,14 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     session({ session, token, user }) {
       if (session.user) {
         session.user.id = user?.id ?? (token.id as string | undefined) ?? session.user.id;
+
+        const isDemoSessionUser =
+          session.user.id === demoUser.id || session.user.email === demoUser.email;
+
+        if (isDemoSessionUser) {
+          session.user.name = demoUser.name;
+          session.user.email = demoUser.email;
+        }
       }
 
       return session;

@@ -12,11 +12,13 @@ function createRequest(ipAddress: string) {
   });
 }
 
-function resetAttempts(request: Request, email = demoUser.email) {
-  clearCredentialSignInAttempts(email, request);
+async function resetAttempts(request: Request, email = demoUser.email) {
+  await clearCredentialSignInAttempts(email, request);
 }
 
 test("authorizeCredentialsSignIn returns the demo user in mock mode for valid credentials", async () => {
+  const clearedEmails: Array<string | null | undefined> = [];
+
   const result = await authorizeCredentialsSignIn(
     {
       email: demoUser.email,
@@ -24,7 +26,9 @@ test("authorizeCredentialsSignIn returns the demo user in mock mode for valid cr
     },
     createRequest("203.0.113.10"),
     {
-      hasDatabase: false,
+      clearAttempts: (email) => {
+        clearedEmails.push(email);
+      },
     }
   );
 
@@ -33,6 +37,7 @@ test("authorizeCredentialsSignIn returns the demo user in mock mode for valid cr
     name: demoUser.name,
     email: demoUser.email,
   });
+  assert.deepEqual(clearedEmails, [demoUser.email]);
 });
 
 test("authorizeCredentialsSignIn short-circuits when the request is already rate limited", async () => {
@@ -66,7 +71,6 @@ test("authorizeCredentialsSignIn records a failed attempt when sign-in payload v
     },
     createRequest("203.0.113.12"),
     {
-      hasDatabase: false,
       recordFailedAttempt: (email) => {
         attemptedEmails.push(email);
       },
@@ -77,60 +81,16 @@ test("authorizeCredentialsSignIn records a failed attempt when sign-in payload v
   assert.deepEqual(attemptedEmails, ["demo@cadence.app"]);
 });
 
-test("authorizeCredentialsSignIn clears failures after a successful database-backed sign-in", async () => {
-  const clearedEmails: Array<string | null | undefined> = [];
-
-  const result = await authorizeCredentialsSignIn(
-    {
-      email: "member@cadence.app",
-      password: demoUser.password,
-    },
-    createRequest("203.0.113.13"),
-    {
-      hasDatabase: true,
-      findUserByEmail: async (email) => ({
-        id: "user-1",
-        name: "Member",
-        email,
-        image: "https://example.com/avatar.png",
-        passwordHash: "stored-hash",
-      }),
-      comparePassword: async (password, passwordHash) =>
-        password === demoUser.password && passwordHash === "stored-hash",
-      clearAttempts: (email) => {
-        clearedEmails.push(email);
-      },
-    }
-  );
-
-  assert.deepEqual(result, {
-    id: "user-1",
-    name: "Member",
-    email: "member@cadence.app",
-    image: "https://example.com/avatar.png",
-  });
-  assert.deepEqual(clearedEmails, ["member@cadence.app"]);
-});
-
-test("authorizeCredentialsSignIn records a failed attempt when the database password check fails", async () => {
+test("authorizeCredentialsSignIn rejects non-demo credentials", async () => {
   const attemptedEmails: Array<string | null | undefined> = [];
 
   const result = await authorizeCredentialsSignIn(
     {
       email: "member@cadence.app",
-      password: demoUser.password,
+      password: "member-password",
     },
-    createRequest("203.0.113.14"),
+    createRequest("203.0.113.13"),
     {
-      hasDatabase: true,
-      findUserByEmail: async (email) => ({
-        id: "user-1",
-        name: "Member",
-        email,
-        image: null,
-        passwordHash: "stored-hash",
-      }),
-      comparePassword: async () => false,
       recordFailedAttempt: (email) => {
         attemptedEmails.push(email);
       },
@@ -143,7 +103,7 @@ test("authorizeCredentialsSignIn records a failed attempt when the database pass
 
 test("authorizeCredentialsSignIn starts rejecting even valid mock-mode credentials after repeated real failed attempts", async () => {
   const request = createRequest("203.0.113.15");
-  resetAttempts(request);
+  await resetAttempts(request);
 
   try {
     for (let attempt = 1; attempt <= 8; attempt += 1) {
@@ -152,10 +112,7 @@ test("authorizeCredentialsSignIn starts rejecting even valid mock-mode credentia
           email: demoUser.email,
           password: "wrong-password",
         },
-        request,
-        {
-          hasDatabase: false,
-        }
+        request
       );
 
       assert.equal(result, null);
@@ -166,14 +123,11 @@ test("authorizeCredentialsSignIn starts rejecting even valid mock-mode credentia
         email: demoUser.email,
         password: demoUser.password,
       },
-      request,
-      {
-        hasDatabase: false,
-      }
+      request
     );
 
     assert.equal(blockedResult, null);
   } finally {
-    resetAttempts(request);
+    await resetAttempts(request);
   }
 });

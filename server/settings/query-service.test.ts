@@ -66,7 +66,7 @@ test("getSettingsPageDataWithDependencies falls back to mock data when no user r
 
 test("buildSettingsPageDataFromUser normalizes the profile and summary fields", () => {
   const result = buildSettingsPageDataFromUser({
-    name: "  Lewis  ",
+    name: "  Demo  ",
     email: demoUser.email,
     timezone: "Mars/Colony",
     createdAt: new Date("2026-01-12T09:00:00.000Z"),
@@ -81,7 +81,7 @@ test("buildSettingsPageDataFromUser normalizes the profile and summary fields", 
   });
 
   assert.equal(result.dataSource, "database");
-  assert.equal(result.profile.name, "Lewis");
+  assert.equal(result.profile.name, "Demo");
   assert.equal(result.profile.timezone, "UTC");
   assert.equal(result.summary.activityCount, 8);
   assert.equal(result.summary.insightCount, 3);

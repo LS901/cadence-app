@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { endOfDay, format, isSameDay, startOfDay } from "date-fns";
-import { buildMockDashboardData, demoUser, mockLifeEventItems, mockMoodEntries } from "@/lib/data/mock-cadence";
+import { buildMockDashboardData, demoUser, getMockScenarioData } from "@/lib/data/mock-cadence";
+import { defaultMockScenario, type MockScenarioKey } from "@/lib/data/mock-scenarios";
 import { db, hasDatabaseUrl } from "@/lib/db";
 import { lifeEventOverlapsDay } from "@/lib/life-events";
 import type { MoodPageData, MoodReflectionEntry } from "@/features/mood/types";
@@ -124,18 +125,22 @@ function mapMoodEntry(entry: {
   };
 }
 
-function buildMockMoodPageData(focusWindow?: FocusWindow | null): MoodPageData {
+function buildMockMoodPageData(
+  focusWindow?: FocusWindow | null,
+  scenario: MockScenarioKey = defaultMockScenario
+): MoodPageData {
   const normalizedFocusWindow = normalizeFocusWindow(focusWindow);
-  const dashboardData = buildMockDashboardData(normalizedFocusWindow);
+  const scenarioData = getMockScenarioData(scenario);
+  const dashboardData = buildMockDashboardData(normalizedFocusWindow, scenario);
   const analysis = buildInsightAnalysisSnapshot({
     activities: [],
     habits: [],
     habitLogs: [],
     journalEntries: [],
-    moodEntries: mockMoodEntries,
+    moodEntries: scenarioData.moodEntries,
     lifeEvents: [],
   });
-  const mappedEntries = mockMoodEntries.map((entry) => mapMoodEntry(entry));
+  const mappedEntries = scenarioData.moodEntries.map((entry) => mapMoodEntry(entry));
   const scopedEntries = normalizedFocusWindow
     ? mappedEntries.filter((entry) => isWithinFocusWindow(new Date(entry.dayIso), normalizedFocusWindow))
     : mappedEntries;
@@ -146,7 +151,7 @@ function buildMockMoodPageData(focusWindow?: FocusWindow | null): MoodPageData {
     .reverse();
   const currentEntry = recentEntries[0] ?? null;
   const recentContext = normalizedFocusWindow
-    ? mockLifeEventItems.filter((event) => overlapsFocusWindow(event, normalizedFocusWindow))
+    ? scenarioData.lifeEventItems.filter((event) => overlapsFocusWindow(event, normalizedFocusWindow))
     : dashboardData.recentContext;
   const insightHighlights = analysis.candidates.length
     ? analysis.candidates.slice(0, 2)
@@ -172,10 +177,14 @@ function buildMockMoodPageData(focusWindow?: FocusWindow | null): MoodPageData {
   };
 }
 
-export async function getMoodPageData(userId = demoUser.id, focusWindow?: FocusWindow | null): Promise<MoodPageData> {
+export async function getMoodPageData(
+  userId = demoUser.id,
+  focusWindow?: FocusWindow | null,
+  scenario: MockScenarioKey = defaultMockScenario
+): Promise<MoodPageData> {
   return getMoodPageDataWithDependencies(userId, focusWindow, {
     hasDatabase: hasDatabaseUrl && Boolean(db?.moodEntry),
-    buildMockMoodPageData,
+    buildMockMoodPageData: (window) => buildMockMoodPageData(window, scenario),
     findMoodEntries: async (currentUserId) => {
       return db!.moodEntry.findMany({
         where: { userId: currentUserId },
@@ -192,7 +201,7 @@ export async function getMoodPageData(userId = demoUser.id, focusWindow?: FocusW
         take: 35,
       });
     },
-    getInsightSnapshot: getInsightAnalysisSnapshot,
+    getInsightSnapshot: (currentUserId) => getInsightAnalysisSnapshot(currentUserId, scenario),
     getLifeEventsContextData,
   });
 }

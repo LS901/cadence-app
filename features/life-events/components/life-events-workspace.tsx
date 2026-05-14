@@ -42,6 +42,7 @@ import { deleteLifeEventAction, upsertLifeEventAction } from "@/server/life-even
 
 type LifeEventsWorkspaceProps = {
   data: LifeEventsPageData;
+  readOnlyDemo?: boolean;
 };
 
 type LifeEventFormState = {
@@ -119,11 +120,13 @@ function EventListItem({
   isPending,
   onEdit,
   onDelete,
+  readOnlyDemo = false,
 }: {
   event: LifeEventItem;
   isPending: boolean;
   onEdit: (event: LifeEventItem) => void;
   onDelete: (event: LifeEventItem) => void;
+  readOnlyDemo?: boolean;
 }) {
   const generatedOccurrence = isGeneratedOccurrence(event);
 
@@ -162,14 +165,14 @@ function EventListItem({
         </p>
       ) : null}
       <div className="mt-4 flex justify-end gap-2">
-        <Button type="button" variant="ghost" className="rounded-full" disabled={generatedOccurrence} onClick={() => onEdit(event)}>
+        <Button type="button" variant="ghost" className="rounded-full" disabled={generatedOccurrence || readOnlyDemo} onClick={() => onEdit(event)}>
           Edit
         </Button>
         <Button
           type="button"
           variant="ghost"
           className="rounded-full text-muted-foreground"
-          disabled={isPending || generatedOccurrence}
+          disabled={isPending || generatedOccurrence || readOnlyDemo}
           onClick={() => onDelete(event)}
         >
           <Trash2 className="size-4" />
@@ -180,7 +183,7 @@ function EventListItem({
   );
 }
 
-export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
+export function LifeEventsWorkspace({ data, readOnlyDemo = false }: LifeEventsWorkspaceProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -290,7 +293,10 @@ export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
           <Badge variant="outline" className="rounded-full border-border/40 px-3 py-1 text-[11px] uppercase tracking-[0.22em]">
             {data.dataSource === "mock" ? "Mock preview" : "Database connected"}
           </Badge>
-          <Button type="button" className="rounded-full" onClick={openCreateSheet}>
+          {readOnlyDemo ? (
+            <p className="text-sm text-muted-foreground">Shared demo is preview-only. Context logging is disabled.</p>
+          ) : null}
+          <Button type="button" className="rounded-full" onClick={openCreateSheet} disabled={readOnlyDemo}>
             <Plus className="size-4" />
             Log context
           </Button>
@@ -364,6 +370,7 @@ export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
                   isPending={isPending}
                   onEdit={openEditSheet}
                   onDelete={handleDeleteEvent}
+                  readOnlyDemo={readOnlyDemo}
                 />
               ))
             ) : (
@@ -418,6 +425,7 @@ export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
                     isPending={isPending}
                     onEdit={openEditSheet}
                     onDelete={handleDeleteEvent}
+                    readOnlyDemo={readOnlyDemo}
                   />
                 ))
               ) : (
@@ -444,6 +452,7 @@ export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
                 isPending={isPending}
                 onEdit={openEditSheet}
                 onDelete={handleDeleteEvent}
+                readOnlyDemo={readOnlyDemo}
               />
             ))
           ) : (
@@ -698,7 +707,7 @@ export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
                   <Button type="button" variant="outline" className="rounded-full" onClick={() => closeSheet(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="rounded-full" disabled={isPending}>
+                  <Button type="submit" className="rounded-full" disabled={isPending || readOnlyDemo}>
                     <Save className="size-4" />
                     {formState.id ? "Save changes" : "Save context"}
                   </Button>
@@ -747,7 +756,7 @@ export function LifeEventsWorkspace({ data }: LifeEventsWorkspaceProps) {
               >
                 Keep event
               </Button>
-              <Button type="button" className="rounded-full" disabled={isPending} onClick={confirmDeleteEvent}>
+              <Button type="button" className="rounded-full" disabled={isPending || readOnlyDemo} onClick={confirmDeleteEvent}>
                 <Trash2 className="size-4" />
                 {eventPendingDeletion?.isRecurring ? "Delete series" : "Delete event"}
               </Button>

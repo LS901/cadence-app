@@ -1,21 +1,19 @@
 import { auth } from "@/auth";
 import { PlannerWorkspace } from "@/features/planner/components/planner-workspace";
-import type { PlannerSuggestedActivityDraft } from "@/features/planner/types";
+import { getSuggestedDraftFromWeeklyReview } from "@/features/planner/lib/suggested-draft";
+import { isReadOnlyDemoSession } from "@/lib/auth/read-only-demo";
 import { demoUser } from "@/lib/data/mock-cadence";
-import { activityCategoryValues, recurrencePatternValues } from "@/lib/validation/activity";
+import { normalizeMockScenario } from "@/lib/data/mock-scenarios";
+import { getDashboardData } from "@/server/dashboard/queries";
 import { getInsightAnalysisSnapshot } from "@/server/insights/queries";
 import { getPlannerData } from "@/server/planner/queries";
 
 type PlannerPageProps = {
   searchParams?: Promise<{
     compose?: string | string[];
-    title?: string | string[];
-    historyAnchorTitle?: string | string[];
-    category?: string | string[];
-    notes?: string | string[];
-    durationMinutes?: string | string[];
-    recurring?: string | string[];
-    recurrencePattern?: string | string[];
+    entry?: string | string[];
+    source?: string | string[];
+    scenario?: string | string[];
   }>;
 };
 
@@ -23,68 +21,34 @@ function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function getPlannerSuggestionFromSearchParams(
-  value:
-    | Awaited<PlannerPageProps["searchParams"]>
-    | undefined
-): PlannerSuggestedActivityDraft | null {
-  const title = getSingleParam(value?.title)?.trim();
-  const historyAnchorTitle = getSingleParam(value?.historyAnchorTitle)?.trim();
-  const category = getSingleParam(value?.category);
-  const notes = getSingleParam(value?.notes)?.trim();
-  const durationMinutes = getSingleParam(value?.durationMinutes)?.trim();
-  const recurring = getSingleParam(value?.recurring) === "true";
-  const recurrencePattern = getSingleParam(value?.recurrencePattern);
-
-  if (!title || !category || !notes) {
-    return null;
-  }
-
-  if (!activityCategoryValues.includes(category as (typeof activityCategoryValues)[number])) {
-    return null;
-  }
-
-  const normalizedCategory = activityCategoryValues.find((candidate) => candidate === category);
-
-  if (!normalizedCategory) {
-    return null;
-  }
-
-  const normalizedRecurrencePattern = recurring
-    ? recurrencePatternValues.find((candidate) => candidate === recurrencePattern) ?? ""
-    : "";
-
-  const normalizedDuration = durationMinutes && /^\d+$/.test(durationMinutes)
-    ? String(Math.max(1, Math.min(600, Number(durationMinutes))))
-    : "";
-
-  return {
-    title: title.slice(0, 80),
-    historyAnchorTitle: historyAnchorTitle ? historyAnchorTitle.slice(0, 80) : null,
-    category: normalizedCategory,
-    notes: notes.slice(0, 400),
-    durationMinutes: normalizedDuration,
-    recurring,
-    recurrencePattern: normalizedRecurrencePattern,
-  };
-}
-
 export default async function PlannerPage({ searchParams }: PlannerPageProps) {
   const session = await auth();
+  const readOnlyDemo = isReadOnlyDemoSession(session);
   const userId = session?.user?.id ?? demoUser.id;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const composeParam = getSingleParam(resolvedSearchParams?.compose);
-  const suggestedActivityDraft = getPlannerSuggestionFromSearchParams(resolvedSearchParams);
-  const [data, insightAnalysis] = await Promise.all([
-    getPlannerData(userId),
-    getInsightAnalysisSnapshot(userId),
+  const entryMode = getSingleParam(resolvedSearchParams?.entry) === "guided-demo" ? "guided-demo" : null;
+  const entrySource = getSingleParam(resolvedSearchParams?.source) ?? null;
+  const scenario = normalizeMockScenario(getSingleParam(resolvedSearchParams?.scenario) ?? null);
+  const shouldOpenReviewDraft = composeParam === "review";
+  const [data, insightAnalysis, dashboardData] = await Promise.all([
+    getPlannerData(userId, scenario),
+    getInsightAnalysisSnapshot(userId, scenario),
+    shouldOpenReviewDraft ? getDashboardData(userId, null, scenario) : Promise.resolve(null),
   ]);
+  const suggestedActivityDraft = shouldOpenReviewDraft
+    ? getSuggestedDraftFromWeeklyReview(dashboardData?.weeklyReview)
+    : null;
 
   return (
     <PlannerWorkspace
       data={data}
+      entryMode={entryMode}
+      entrySource={entrySource}
+      scenario={scenario}
       suggestedActivityDraft={suggestedActivityDraft}
-      openSuggestedDraftOnLoad={composeParam === "review" && Boolean(suggestedActivityDraft)}
+      openSuggestedDraftOnLoad={!readOnlyDemo && shouldOpenReviewDraft && Boolean(suggestedActivityDraft)}
+      readOnlyDemo={readOnlyDemo}
       insightHighlights={(insightAnalysis.candidates.length ? insightAnalysis.candidates : insightAnalysis.exploratoryCandidates).slice(0, 2).map((candidate) => ({
         id: candidate.id,
         title: candidate.title,

@@ -93,6 +93,20 @@ function uniqueStrings(values: string[]) {
   return values.filter((value, index, items) => items.indexOf(value) === index);
 }
 
+function getLifeEventTitlesForDay(lifeEvents: AnalyticsLifeEvent[], day: Date) {
+  const dayStart = new Date(day);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  return uniqueStrings(
+    lifeEvents
+      .filter((event) => {
+        const eventEnd = event.endAt ?? dayEnd;
+        return event.startAt < dayEnd && eventEnd > dayStart;
+      })
+      .map((event) => event.title)
+  );
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -335,6 +349,59 @@ function getAlignedDayCount(options: {
   }).length;
 }
 
+function buildCandidateStoryAnchors(options: {
+  rows: DailyBehaviorFeatureRow[];
+  exposure: number[];
+  outcome: number[];
+  direction: InsightAnalysisCandidate["direction"];
+}) {
+  if (options.direction === "NEUTRAL") {
+    return [];
+  }
+
+  const outcomeMean = average(options.outcome) ?? 0;
+
+  return options.rows
+    .map((row, index) => ({
+      row,
+      exposure: options.exposure[index] ?? 0,
+      outcome: options.outcome[index] ?? outcomeMean,
+    }))
+    .filter((entry) => entry.exposure > 0)
+    .filter((entry) => entry.row.journalTitles.length > 0 || entry.row.lifeEventTitles.length > 0)
+    .map((entry) => {
+      const aligned =
+        options.direction === "POSITIVE"
+          ? entry.outcome >= outcomeMean
+          : entry.outcome <= outcomeMean;
+
+      return {
+        ...entry,
+        aligned,
+        rank:
+          (aligned ? 4 : 0) +
+          (entry.row.journalTitles.length ? 2 : 0) +
+          (entry.row.lifeEventTitles.length ? 2 : 0) +
+          (entry.row.confoundedDay ? 1 : 0),
+      };
+    })
+    .sort((left, right) => {
+      return (
+        right.rank - left.rank ||
+        right.exposure - left.exposure ||
+        right.row.day.getTime() - left.row.day.getTime()
+      );
+    })
+    .slice(0, 2)
+    .map((entry) => ({
+      dayIso: entry.row.day.toISOString(),
+      moodScore: entry.row.moodScore,
+      journalTitles: entry.row.journalTitles.slice(0, 2),
+      lifeEventTitles: entry.row.lifeEventTitles.slice(0, 2),
+      confoundedDay: entry.row.confoundedDay,
+    }));
+}
+
 function getMetricSpecificCausalityNote(
   metric: InsightAnalysisCandidate["metric"],
   lagDays: number
@@ -506,6 +573,12 @@ function buildCandidate(options: {
     exposure: options.exposure,
     outcome: options.outcome,
   });
+  const storyAnchors = buildCandidateStoryAnchors({
+    rows: options.rows,
+    exposure: options.exposure,
+    outcome: options.outcome,
+    direction,
+  });
 
   return {
     id: `${options.metric.toLowerCase()}-${options.lagDays}`,
@@ -569,6 +642,7 @@ function buildCandidate(options: {
       rawConfidence,
       adjustedConfidence,
       confounderAdjusted: confoundedDayShare > 0,
+      storyAnchors,
     },
   } satisfies InsightAnalysisCandidate;
 }
@@ -576,6 +650,7 @@ function buildCandidate(options: {
 export function buildBehaviorFeatureRows(input: AnalysisInput): DailyBehaviorFeatureRow[] {
   const habitTypeById = new Map(input.habits.map((habit) => [habit.id, habit.type]));
   const lifeEvents = input.lifeEvents ?? [];
+  const lifeEventTitleById = new Map(lifeEvents.map((event) => [event.id, event.title]));
   const lifeEventDayExposureGroups = new Map<string, AnalyticsLifeEventDayExposure[]>();
   const activityGroups = new Map<string, AnalyticsActivity[]>();
   const habitLogGroups = new Map<string, AnalyticsHabitLog[]>();
@@ -613,6 +688,18 @@ export function buildBehaviorFeatureRows(input: AnalysisInput): DailyBehaviorFea
     const lifeEventContext = dayExposures.length
       ? getLifeEventDayContextFromExposures(dayExposures)
       : getLifeEventDayContext(lifeEvents, entry.day);
+    const journalTitles = uniqueStrings(
+      journalEntries
+        .map((journalEntry) => journalEntry.title?.trim())
+        .filter((title): title is string => Boolean(title))
+    );
+    const lifeEventTitles = dayExposures.length
+      ? uniqueStrings(
+          dayExposures
+            .map((exposure) => lifeEventTitleById.get(exposure.lifeEventId))
+            .filter((title): title is string => Boolean(title))
+        )
+      : getLifeEventTitlesForDay(lifeEvents, entry.day);
 
     return {
       day: entry.day,
@@ -644,6 +731,7 @@ export function buildBehaviorFeatureRows(input: AnalysisInput): DailyBehaviorFea
       ).length,
       journalEntryCount: journalEntries.length,
       journalSentimentScore: average(journalEntries.map(scoreJournalSentiment)),
+      journalTitles,
       moodPeriodsCount: entry.periods.length,
       activeLifeEventCount: lifeEventContext.activeLifeEventCount,
       overlappingLifeEventCount: lifeEventContext.overlappingLifeEventCount,
@@ -652,6 +740,7 @@ export function buildBehaviorFeatureRows(input: AnalysisInput): DailyBehaviorFea
       neutralLifeEventLoad: lifeEventContext.neutralLifeEventLoad,
       totalLifeEventLoad: lifeEventContext.totalLifeEventLoad,
       confoundedDay: lifeEventContext.confoundedDay,
+      lifeEventTitles,
       lifeEventCategories: lifeEventContext.lifeEventCategories,
       lifeEventTags: lifeEventContext.lifeEventTags,
       tags: entry.tags,

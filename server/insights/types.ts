@@ -106,6 +106,7 @@ export type DailyBehaviorFeatureRow = {
   negativeHabitsCompleted: number;
   journalEntryCount: number;
   journalSentimentScore: number | null;
+  journalTitles: string[];
   moodPeriodsCount: number;
   activeLifeEventCount: number;
   overlappingLifeEventCount: number;
@@ -114,6 +115,7 @@ export type DailyBehaviorFeatureRow = {
   neutralLifeEventLoad: number;
   totalLifeEventLoad: number;
   confoundedDay: boolean;
+  lifeEventTitles: string[];
   lifeEventCategories: string[];
   lifeEventTags: string[];
   tags: string[];

@@ -25,6 +25,13 @@ function createActivityRecord(overrides?: Partial<{
   scheduledAt: Date;
   status: string;
   durationMinutes: number | null;
+  experimentHypothesis: string | null;
+  experimentObservationPrompt: string | null;
+  experimentReviewWindowDays: number | null;
+  experimentUncertaintyNote: string | null;
+  experimentOutcome: string | null;
+  experimentOutcomeNote: string | null;
+  experimentReviewedAt: Date | null;
   completedAt: Date | null;
   skippedAt: Date | null;
   completionMoodScore: number | null;
@@ -44,6 +51,13 @@ function createActivityRecord(overrides?: Partial<{
     scheduledAt: overrides?.scheduledAt ?? new Date("2030-05-10T18:30:00.000Z"),
     status: overrides?.status ?? "SCHEDULED",
     durationMinutes: overrides?.durationMinutes ?? 45,
+    experimentHypothesis: overrides?.experimentHypothesis ?? null,
+    experimentObservationPrompt: overrides?.experimentObservationPrompt ?? null,
+    experimentReviewWindowDays: overrides?.experimentReviewWindowDays ?? null,
+    experimentUncertaintyNote: overrides?.experimentUncertaintyNote ?? null,
+    experimentOutcome: overrides?.experimentOutcome ?? null,
+    experimentOutcomeNote: overrides?.experimentOutcomeNote ?? null,
+    experimentReviewedAt: overrides?.experimentReviewedAt ?? null,
     completedAt: overrides?.completedAt ?? null,
     skippedAt: overrides?.skippedAt ?? null,
     completionMoodScore: overrides?.completionMoodScore ?? null,
@@ -87,6 +101,13 @@ function createDependencies(options?: {
         scheduledAt: payload.data.scheduledAt as Date,
         status: payload.data.status as string,
         durationMinutes: (payload.data.durationMinutes as number | null | undefined) ?? null,
+        experimentHypothesis: (payload.data.experimentHypothesis as string | null | undefined) ?? null,
+        experimentObservationPrompt: (payload.data.experimentObservationPrompt as string | null | undefined) ?? null,
+        experimentReviewWindowDays: (payload.data.experimentReviewWindowDays as number | null | undefined) ?? null,
+        experimentUncertaintyNote: (payload.data.experimentUncertaintyNote as string | null | undefined) ?? null,
+        experimentOutcome: (payload.data.experimentOutcome as string | null | undefined) ?? null,
+        experimentOutcomeNote: (payload.data.experimentOutcomeNote as string | null | undefined) ?? null,
+        experimentReviewedAt: (payload.data.experimentReviewedAt as Date | null | undefined) ?? null,
         completedAt: (payload.data.completedAt as Date | null | undefined) ?? null,
         skippedAt: (payload.data.skippedAt as Date | null | undefined) ?? null,
         completionMoodScore: (payload.data.completionMoodScore as number | null | undefined) ?? null,
@@ -102,6 +123,13 @@ function createDependencies(options?: {
         recurrencePattern: (payload.data.recurrencePattern as string | null | undefined) ?? "DAILY",
         scheduledAt: (payload.data.scheduledAt as Date | undefined) ?? new Date("2030-05-10T18:30:00.000Z"),
         status: (payload.data.status as string | undefined) ?? "SCHEDULED",
+        experimentHypothesis: (payload.data.experimentHypothesis as string | null | undefined) ?? null,
+        experimentObservationPrompt: (payload.data.experimentObservationPrompt as string | null | undefined) ?? null,
+        experimentReviewWindowDays: (payload.data.experimentReviewWindowDays as number | null | undefined) ?? null,
+        experimentUncertaintyNote: (payload.data.experimentUncertaintyNote as string | null | undefined) ?? null,
+        experimentOutcome: (payload.data.experimentOutcome as string | null | undefined) ?? null,
+        experimentOutcomeNote: (payload.data.experimentOutcomeNote as string | null | undefined) ?? null,
+        experimentReviewedAt: (payload.data.experimentReviewedAt as Date | null | undefined) ?? null,
         completedAt: (payload.data.completedAt as Date | null | undefined) ?? null,
         skippedAt: (payload.data.skippedAt as Date | null | undefined) ?? null,
         completionMoodScore: (payload.data.completionMoodScore as number | null | undefined) ?? null,
@@ -157,6 +185,10 @@ function createActivityInput() {
     recurrenceCustom: "",
     scheduledAt: "2030-05-10T18:30:00.000Z",
     durationMinutes: "45",
+    experimentHypothesis: "If I protect an evening walk earlier in the week, my baseline should stay steadier.",
+    experimentObservationPrompt: "Notice whether the rest of the evening feels less scattered afterward.",
+    experimentReviewWindowDays: "7",
+    experimentUncertaintyNote: "One week is only a directional test, not proof.",
     completionMoodScore: "72",
     entryMode: "PLANNED",
   };
@@ -191,6 +223,8 @@ test("upsertActivity creates a planned recurring activity, seeds its group, exte
   assert.equal(createPayload.data.status, "SCHEDULED");
   assert.equal(createPayload.data.completedAt, null);
   assert.equal(createPayload.data.completionMoodScore, null);
+  assert.match(String(createPayload.data.experimentHypothesis), /evening walk/i);
+  assert.equal(createPayload.data.experimentReviewWindowDays, 7);
   assert.deepEqual(recurrenceUpdatePayload, {
     where: { id: "activity-created" },
     data: { recurrenceGroupId: "activity-created" },
@@ -243,6 +277,7 @@ test("updateActivityStatus completes an eligible activity and stamps completion 
       createActivityRecord({
         id: "activity-status",
         scheduledAt: new Date("2030-05-10T18:00:00.000Z"),
+        experimentHypothesis: "If I finish this walk after work, my evening should feel steadier.",
         completionMoodScore: 58,
       }),
     ],
@@ -254,6 +289,8 @@ test("updateActivityStatus completes an eligible activity and stamps completion 
       id: "activity-status",
       status: "COMPLETED",
       completionMoodScore: "64",
+      experimentOutcome: "SUPPORTED",
+      experimentOutcomeNote: "The rest of the evening felt noticeably calmer.",
     },
     dependencies
   );
@@ -273,6 +310,9 @@ test("updateActivityStatus completes an eligible activity and stamps completion 
   assert.equal((updatePayload.data.completedAt as Date).toISOString(), "2030-05-10T19:00:00.000Z");
   assert.equal(updatePayload.data.skippedAt, null);
   assert.equal(updatePayload.data.completionMoodScore, 64);
+  assert.equal(updatePayload.data.experimentOutcome, "SUPPORTED");
+  assert.match(String(updatePayload.data.experimentOutcomeNote), /calmer/i);
+  assert.equal((updatePayload.data.experimentReviewedAt as Date).toISOString(), "2030-05-10T19:00:00.000Z");
 });
 
 test("updateActivityStatus rejects completing an activity before its scheduled time", async () => {
