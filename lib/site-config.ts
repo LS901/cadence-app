@@ -15,10 +15,14 @@ export const siteConfig = {
   ],
 } as const;
 
+import { normalizeAbsoluteUrl } from "@/lib/url-config";
+
 const fallbackSiteUrl = "http://localhost:3000";
 
 export function getSiteUrl() {
-  const configuredUrl = process.env.APP_BASE_URL?.trim() || process.env.NEXTAUTH_URL?.trim();
+  const configuredUrl =
+    normalizeAbsoluteUrl(process.env.APP_BASE_URL) ??
+    normalizeAbsoluteUrl(process.env.NEXTAUTH_URL);
 
   try {
     return new URL(configuredUrl || fallbackSiteUrl);

@@ -3,26 +3,50 @@ import test from "node:test";
 import { buildAuthActionUrl, isAuthEmailDeliveryAvailable, sendAuthActionEmail } from "./auth-email";
 
 test("buildAuthActionUrl creates a verify-email link from the request origin", () => {
-  const url = buildAuthActionUrl(
-    "verify-email",
-    "user@cadence.app",
-    "token-123",
-    "https://cadence.example.com"
-  );
+  const originalAppBaseUrl = process.env.APP_BASE_URL;
+  const originalNextAuthUrl = process.env.NEXTAUTH_URL;
 
-  assert.equal(
-    url,
-    "https://cadence.example.com/verify-email?email=user%40cadence.app&token=token-123"
-  );
+  delete process.env.APP_BASE_URL;
+  delete process.env.NEXTAUTH_URL;
+
+  try {
+    const url = buildAuthActionUrl(
+      "verify-email",
+      "user@cadence.app",
+      "token-123",
+      "https://cadence.example.com"
+    );
+
+    assert.equal(
+      url,
+      "https://cadence.example.com/verify-email?email=user%40cadence.app&token=token-123"
+    );
+  } finally {
+    if (typeof originalAppBaseUrl === "undefined") {
+      delete process.env.APP_BASE_URL;
+    } else {
+      process.env.APP_BASE_URL = originalAppBaseUrl;
+    }
+
+    if (typeof originalNextAuthUrl === "undefined") {
+      delete process.env.NEXTAUTH_URL;
+    } else {
+      process.env.NEXTAUTH_URL = originalNextAuthUrl;
+    }
+  }
 });
 
 test("sendAuthActionEmail returns a preview link in non-production when SMTP is not configured", async () => {
+  const originalAppBaseUrl = process.env.APP_BASE_URL;
+  const originalNextAuthUrl = process.env.NEXTAUTH_URL;
   const originalNodeEnv = process.env.NODE_ENV;
   delete process.env.SMTP_HOST;
   delete process.env.SMTP_PORT;
   delete process.env.SMTP_USER;
   delete process.env.SMTP_PASSWORD;
   delete process.env.SMTP_FROM_EMAIL;
+  delete process.env.APP_BASE_URL;
+  delete process.env.NEXTAUTH_URL;
   process.env.NODE_ENV = "development";
 
   try {
@@ -40,6 +64,18 @@ test("sendAuthActionEmail returns a preview link in non-production when SMTP is 
         "https://cadence.example.com/reset-password?email=user%40cadence.app&token=token-123",
     });
   } finally {
+    if (typeof originalAppBaseUrl === "undefined") {
+      delete process.env.APP_BASE_URL;
+    } else {
+      process.env.APP_BASE_URL = originalAppBaseUrl;
+    }
+
+    if (typeof originalNextAuthUrl === "undefined") {
+      delete process.env.NEXTAUTH_URL;
+    } else {
+      process.env.NEXTAUTH_URL = originalNextAuthUrl;
+    }
+
     process.env.NODE_ENV = originalNodeEnv;
   }
 });

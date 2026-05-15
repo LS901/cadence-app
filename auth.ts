@@ -2,6 +2,9 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authorizeCredentialsSignIn } from "@/lib/auth/authorize-credentials";
 import { demoUser } from "@/lib/data/mock-cadence";
+import { applyNormalizedAuthUrls } from "@/lib/url-config";
+
+applyNormalizedAuthUrls();
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,

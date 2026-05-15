@@ -111,7 +111,7 @@ export function AppShell({ userName, userEmail, children }: AppShellProps) {
                       <Menu className="size-4" />
                     </SheetTrigger>
                     <SheetContent side="left" className="border-border/40 bg-sidebar/96 p-0 backdrop-blur-2xl">
-                      <SheetHeader className="border-b border-border/40 px-5 py-5 text-left">
+                      <SheetHeader className="shrink-0 border-b border-border/40 px-5 py-5 text-left">
                         <div className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="flex h-14 w-12 shrink-0 items-center justify-center rounded-[22px] border border-white/8 bg-white/[0.04]">
@@ -130,50 +130,54 @@ export function AppShell({ userName, userEmail, children }: AppShellProps) {
                         </div>
                       </SheetHeader>
 
-                      <div className="flex h-full flex-col px-5 pb-5 pt-4">
-                        <nav className="flex flex-col gap-1.5">
-                          {navigation.map((item) => {
-                            const Icon = item.icon;
+                      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4">
+                        <div className="flex min-h-full flex-col">
+                          <nav className="flex flex-col gap-1.5">
+                            {navigation.map((item) => {
+                              const Icon = item.icon;
 
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setIsMobileNavOpen(false)}
-                                className={cn(
-                                  buttonVariants({ variant: "ghost", size: "lg" }),
-                                  "justify-start gap-3 rounded-2xl px-4 text-sm text-sidebar-foreground/80 hover:bg-white/6 hover:text-sidebar-foreground",
-                                  pathname === item.href && "bg-primary/10 text-primary font-medium"
-                                )}
-                              >
-                                <Icon className="size-4" />
-                                {item.label}
-                              </Link>
-                            );
-                          })}
-                        </nav>
+                              return (
+                                <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  onClick={() => setIsMobileNavOpen(false)}
+                                  className={cn(
+                                    buttonVariants({ variant: "ghost", size: "lg" }),
+                                    "justify-start gap-3 rounded-2xl px-4 text-sm text-sidebar-foreground/80 hover:bg-white/6 hover:text-sidebar-foreground",
+                                    pathname === item.href && "bg-primary/10 text-primary font-medium"
+                                  )}
+                                >
+                                  <Icon className="size-4" />
+                                  {item.label}
+                                </Link>
+                              );
+                            })}
+                          </nav>
 
-                        <div className="mt-6 rounded-[28px] border border-border/40 bg-white/4 p-4">
-                          <p className="text-sm font-medium text-foreground">This week&apos;s tone</p>
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            Gentle consistency. Mood stability is strongest on days with low-friction routines.
-                          </p>
-                        </div>
+                          <div className="mt-6 rounded-[28px] border border-border/40 bg-white/4 p-4">
+                            <p className="text-sm font-medium text-foreground">This week&apos;s tone</p>
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                              Gentle consistency. Mood stability is strongest on days with low-friction routines.
+                            </p>
+                          </div>
 
-                        <div className="mt-auto flex items-center gap-3 rounded-[24px] border border-border/40 bg-white/4 px-4 py-3">
-                          <Avatar className="size-9 border border-border/40">
-                            <AvatarFallback className="bg-white/8 text-xs">
-                              {userName
-                                .split(" ")
-                                .map((part) => part[0])
-                                .join("")
-                                .slice(0, 2)
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">{userName}</p>
-                            <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
+                          <div className="mt-auto pt-6">
+                            <div className="flex items-center gap-3 rounded-[24px] border border-border/40 bg-white/4 px-4 py-3">
+                              <Avatar className="size-9 border border-border/40">
+                                <AvatarFallback className="bg-white/8 text-xs">
+                                  {userName
+                                    .split(" ")
+                                    .map((part) => part[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-foreground">{userName}</p>
+                                <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

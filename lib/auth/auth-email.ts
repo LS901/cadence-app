@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
+import { normalizeAbsoluteUrl } from "@/lib/url-config";
 
 export type AuthEmailPurpose = "verify-email" | "reset-password";
 
@@ -33,9 +34,9 @@ function trimEnvValue(value: string | undefined) {
 
 function getAppBaseUrl(requestOrigin?: string) {
   return (
-    trimEnvValue(process.env.APP_BASE_URL) ??
-    trimEnvValue(process.env.NEXTAUTH_URL) ??
-    requestOrigin ??
+    normalizeAbsoluteUrl(process.env.APP_BASE_URL) ??
+    normalizeAbsoluteUrl(process.env.NEXTAUTH_URL) ??
+    normalizeAbsoluteUrl(requestOrigin) ??
     "http://localhost:3000"
   );
 }
