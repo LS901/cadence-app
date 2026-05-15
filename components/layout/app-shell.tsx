@@ -45,7 +45,7 @@ export function AppShell({ userName, userEmail, children }: AppShellProps) {
     <div className="relative min-h-screen overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(144,174,173,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(130,143,158,0.14),transparent_30%)]" />
       <div className="relative mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-border/40 bg-sidebar px-5 py-6 backdrop-blur-xl lg:flex lg:flex-col">
+        <aside className="hidden h-screen border-r border-border/40 bg-sidebar px-5 py-6 backdrop-blur-xl lg:sticky lg:top-0 lg:flex lg:flex-col">
           <div className=" p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-14 w-12 shrink-0 items-center justify-center rounded-[22px] border border-white/8 bg-white/[0.04]">
@@ -63,7 +63,7 @@ export function AppShell({ userName, userEmail, children }: AppShellProps) {
             </h1>
           </div>
 
-          <nav className="mt-10 flex flex-1 flex-col gap-1">
+          <nav className="mt-10 min-h-0 flex flex-1 flex-col gap-1 overflow-y-auto pr-1">
             {navigation.map((item) => {
               const Icon = item.icon;
 
