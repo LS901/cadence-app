@@ -54,6 +54,15 @@ test("getMockPlannerItems returns chronologically sorted items and marks today",
   assert.match(todayItem?.formattedTime ?? "", /\d/);
 });
 
+test("getMockPlannerItems uses realistic non-midnight times", () => {
+  const items = getMockPlannerItems();
+
+  assert.ok(items.length > 0);
+  assert.ok(
+    items.every((item) => item.scheduledAt.getHours() !== 0 || item.scheduledAt.getMinutes() !== 0)
+  );
+});
+
 test("getLatestMockMoodEntry returns the newest mock mood entry", () => {
   assert.equal(getLatestMockMoodEntry()?.id, mockMoodEntries.at(-1)?.id ?? null);
   assert.equal(getLatestMockMoodEntry()?.day.getTime(), mockMoodEntries.at(-1)?.day.getTime() ?? subDays(new Date(), 1).getTime());

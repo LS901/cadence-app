@@ -199,6 +199,12 @@ type DateWindow = {
 
 const today = startOfDay(new Date());
 
+function withTime(date: Date, hours: number, minutes = 0) {
+  const nextDate = new Date(date);
+  nextDate.setHours(hours, minutes, 0, 0);
+  return nextDate;
+}
+
 const moodScores = [62, 64, 67, 71, 69, 76, 79, 74, 77, 81, 75, 72, 78, 83];
 const energyScores = [58, 60, 64, 68, 66, 72, 76, 70, 72, 79, 73, 68, 74, 80];
 const sleepHours = [6.3, 6.8, 7.1, 7.4, 7.0, 7.8, 8.0, 7.2, 7.4, 8.1, 7.6, 7.0, 7.5, 8.2];
@@ -489,7 +495,7 @@ export const mockActivities: MockActivity[] = [
     category: "EXERCISE",
     recurring: true,
     recurrencePattern: "WEEKLY",
-    scheduledAt: addDays(today, 0),
+    scheduledAt: withTime(addDays(today, 0), 13, 15),
     status: "COMPLETED",
     completionMoodScore: 82,
     notes: "Higher energy after lunch.",
@@ -500,7 +506,7 @@ export const mockActivities: MockActivity[] = [
     title: "Dinner with friends",
     category: "SOCIAL",
     recurring: false,
-    scheduledAt: addDays(today, 1),
+    scheduledAt: withTime(addDays(today, 1), 19, 0),
     status: "SCHEDULED",
   },
   {
@@ -510,7 +516,7 @@ export const mockActivities: MockActivity[] = [
     category: "MINDFULNESS",
     recurring: true,
     recurrencePattern: "WEEKLY",
-    scheduledAt: addDays(today, 2),
+    scheduledAt: withTime(addDays(today, 2), 20, 30),
     status: "SCHEDULED",
   },
   {
@@ -520,7 +526,7 @@ export const mockActivities: MockActivity[] = [
     category: "EXERCISE",
     recurring: true,
     recurrencePattern: "DAILY",
-    scheduledAt: subDays(today, 1),
+    scheduledAt: withTime(subDays(today, 1), 7, 30),
     status: "COMPLETED",
     completionMoodScore: 79,
   },
@@ -531,7 +537,7 @@ export const mockActivities: MockActivity[] = [
     category: "SLEEP",
     recurring: true,
     recurrencePattern: "DAILY",
-    scheduledAt: subDays(today, 2),
+    scheduledAt: withTime(subDays(today, 2), 22, 0),
     status: "COMPLETED",
     completionMoodScore: 74,
   },
@@ -541,7 +547,7 @@ export const mockActivities: MockActivity[] = [
     title: "Coffee catch-up",
     category: "SOCIAL",
     recurring: false,
-    scheduledAt: subDays(today, 3),
+    scheduledAt: withTime(subDays(today, 3), 10, 0),
     status: "SKIPPED",
   },
 ];
@@ -554,7 +560,7 @@ const alternateMockActivities: MockActivity[] = [
     category: "EXERCISE",
     recurring: true,
     recurrencePattern: "WEEKLY",
-    scheduledAt: addDays(today, 0),
+    scheduledAt: withTime(addDays(today, 0), 18, 30),
     status: "COMPLETED",
     completionMoodScore: 80,
     notes: "The evening settled faster once the laptop stayed closed.",
@@ -566,7 +572,7 @@ const alternateMockActivities: MockActivity[] = [
     category: "SLEEP",
     recurring: true,
     recurrencePattern: "WEEKLY",
-    scheduledAt: subDays(today, 1),
+    scheduledAt: withTime(subDays(today, 1), 21, 45),
     status: "COMPLETED",
     completionMoodScore: 78,
     notes: "Lower input before bed made the next morning feel less reactive.",
@@ -577,7 +583,7 @@ const alternateMockActivities: MockActivity[] = [
     title: "Midday stretch reset",
     category: "MINDFULNESS",
     recurring: false,
-    scheduledAt: addDays(today, 1),
+    scheduledAt: withTime(addDays(today, 1), 12, 30),
     status: "SCHEDULED",
   },
   {
@@ -587,7 +593,7 @@ const alternateMockActivities: MockActivity[] = [
     category: "FOCUS",
     recurring: true,
     recurrencePattern: "DAILY",
-    scheduledAt: subDays(today, 4),
+    scheduledAt: withTime(subDays(today, 4), 20, 0),
     status: "COMPLETED",
     completionMoodScore: 72,
     notes: "Not glamorous, but it stopped the second workday from leaking into the night.",
@@ -598,7 +604,7 @@ const alternateMockActivities: MockActivity[] = [
     title: "Dinner out without buffer",
     category: "SOCIAL",
     recurring: false,
-    scheduledAt: subDays(today, 6),
+    scheduledAt: withTime(subDays(today, 6), 19, 30),
     status: "SKIPPED",
   },
   {
@@ -607,7 +613,7 @@ const alternateMockActivities: MockActivity[] = [
     title: "Boundary review journaling",
     category: "MINDFULNESS",
     recurring: false,
-    scheduledAt: addDays(today, 2),
+    scheduledAt: withTime(addDays(today, 2), 20, 15),
     status: "SCHEDULED",
   },
 ];
