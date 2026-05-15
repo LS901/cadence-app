@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createPublicMetadata } from "@/lib/public-content";
+import { createPublicMetadata, projectOwner } from "@/lib/public-content";
 
 export const metadata: Metadata = createPublicMetadata({
   title: "About",
@@ -34,6 +34,19 @@ export default function AboutPage() {
         <h2 className="text-xl font-semibold text-foreground">Current stage</h2>
         <p className="mt-4 text-sm leading-7 text-muted-foreground">
           Cadence is being presented as a concept product and portfolio flagship. These public routes exist to explain the product thesis, design decisions, and trust model. The demo itself is completely guided, read-only, and requires no account setup or tracking configuration to explore.
+        </p>
+      </section>
+
+      <section className="rounded-[28px] border border-border/40 bg-card/70 p-6">
+        <h2 className="text-xl font-semibold text-foreground">Project owner & contact</h2>
+        <p className="mt-4 text-sm leading-7 text-muted-foreground">
+          This concept product is designed and built by Lewis Saunders. You can review the associated case study, explore other work, or get in touch below.
+        </p>
+        <p className="mt-3 text-sm leading-7 text-foreground">
+          Portfolio: <a className="underline underline-offset-4" href={projectOwner.portfolioUrl} target="_blank" rel="noreferrer">{projectOwner.portfolioLabel}</a>
+        </p>
+        <p className="mt-2 text-sm leading-7 text-foreground">
+          Email: <a className="underline underline-offset-4" href={`mailto:${projectOwner.contactEmail}`}>{projectOwner.contactEmail}</a>
         </p>
       </section>
     </main>

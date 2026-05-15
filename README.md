@@ -72,11 +72,3 @@ You only need auth email configuration if you later reintroduce private-account 
 - `SMTP_FROM_EMAIL`
 
 In non-production environments, auth email can fall back to local preview links instead of SMTP if those flows are turned back on.
-
-## Supporting docs
-
-- `implementation-plan.md`
-- `testing-plan.md`
-- `manual-qa-plan.md`
-- `portfolio-template.md`
-- `portfolio-deployment-checklist.md`

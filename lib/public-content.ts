@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { absoluteUrl, siteConfig } from "@/lib/site-config";
 
+export const projectOwner = {
+  contactEmail: "lewissaunders.dev@gmail.com",
+  portfolioUrl: "https://lewissaunders.dev",
+  portfolioLabel: "lewissaunders.dev",
+} as const;
+
 export type PublicFeaturePage = {
   slug: string;
   name: string;
@@ -180,7 +186,6 @@ export const useCases = [
 
 export const trustLinks = [
   { href: "/about", label: "About" },
-  { href: "/help", label: "Help" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },

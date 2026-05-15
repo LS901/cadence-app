@@ -8,6 +8,7 @@ import {
   createPublicMetadata,
   getOrganizationJsonLd,
   getWebsiteJsonLd,
+  projectOwner,
   publicFeaturePages,
   trustLinks,
   useCases,
@@ -53,8 +54,8 @@ export default function LandingPage() {
           <Link href="#use-cases" className="text-muted-foreground transition-colors hover:text-foreground">
             Showcase
           </Link>
-          <Link href="/help" className="text-muted-foreground transition-colors hover:text-foreground">
-            Help
+          <Link href="/contact" className="text-muted-foreground transition-colors hover:text-foreground">
+            Contact
           </Link>
         </nav>
         <div className="flex items-center gap-4">
@@ -229,7 +230,7 @@ export default function LandingPage() {
               <div>
                 <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">Supporting routes still matter in a concept product.</h2>
                 <p className="mt-4 max-w-2xl text-sm leading-8 text-muted-foreground sm:text-base">
-                  Trust, help, and contact pages stay public so the project still feels credible and complete, even while the main story shifts away from launch-readiness and toward portfolio presentation.
+                  Supporting pages still matter here, but only when they reinforce the real contract of the site: a guided portfolio demo, a clear privacy position, and a direct way to reach the project owner.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -281,6 +282,9 @@ export default function LandingPage() {
                   {link.label}
                 </Link>
               ))}
+              <a href={projectOwner.portfolioUrl} target="_blank" rel="noreferrer">
+                Portfolio
+              </a>
               <p className="pt-3 text-sm text-muted-foreground">© {new Date().getFullYear()} {siteConfig.name}. All rights reserved.</p>
             </div>
           </div>
