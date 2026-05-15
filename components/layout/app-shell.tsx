@@ -124,9 +124,6 @@ export function AppShell({ userName, userEmail, children }: AppShellProps) {
                             </div>
                           </div>
                           <SheetTitle className="mt-5 max-w-[10ch] text-3xl leading-[1.04]">Reflect in rhythm.</SheetTitle>
-                          <SheetDescription className="mt-3 leading-6">
-                            Move through the app without losing the calm, reflective shell on smaller screens.
-                          </SheetDescription>
                         </div>
                       </SheetHeader>
 
