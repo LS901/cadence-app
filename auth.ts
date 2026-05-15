@@ -4,6 +4,8 @@ import { authorizeCredentialsSignIn } from "@/lib/auth/authorize-credentials";
 import { demoUser } from "@/lib/data/mock-cadence";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   session: {
     strategy: "jwt",
   },
